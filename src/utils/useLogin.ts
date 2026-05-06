@@ -15,19 +15,25 @@ export function useLogin() {
   }
 
   function onChooseAvatar(e) {
-    loginAvatarUrl.value = e.detail.avatarUrl
+    const avatarUrl = e.detail?.avatarUrl || e.detail?.tempFilePath || ''
+    if (avatarUrl) {
+      loginAvatarUrl.value = avatarUrl
+    } else {
+      Taro.showToast({ title: '选择头像失败', icon: 'none' })
+    }
   }
 
   function onNicknameInput(e) {
     loginNickName.value = e.detail.value
   }
 
-  function confirmLogin() {
+  function confirmLogin(avatar = '') {
     if (!loginNickName.value.trim()) {
       Taro.showToast({ title: '请输入昵称', icon: 'none' })
       return false
     }
-    userStore.login(loginNickName.value.trim(), loginAvatarUrl.value)
+    const finalAvatar = avatar || loginAvatarUrl.value
+    userStore.login(loginNickName.value.trim(), finalAvatar)
     showLoginDialog.value = false
     Taro.showToast({ title: '登录成功', icon: 'none' })
     return true

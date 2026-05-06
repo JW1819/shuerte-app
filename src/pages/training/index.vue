@@ -13,15 +13,17 @@
     </view>
 
     <view class="timer-area">
-      <text v-if="phase === 'countdown'" class="countdown-num" :style="{ color: countdownColor }" :key="countdown">{{ countdown }}</text>
-      <text v-else class="timer-text">{{ displayTime }}</text>
+      <text class="timer-text">{{ displayTime }}</text>
     </view>
 
-    <view v-if="phase === 'playing'" class="progress-area">
-      <text class="progress-text">{{ currentTarget - 1 }} / {{ totalCells }}</text>
-      <view class="progress-bar">
-        <view class="progress-fill" :style="{ width: progressPercent + '%' }"></view>
+    <view class="progress-area">
+      <view v-if="phase === 'playing'" class="progress-content">
+        <text class="progress-text">{{ currentTarget - 1 }} / {{ totalCells }}</text>
+        <view class="progress-bar">
+          <view class="progress-fill" :style="{ width: progressPercent + '%' }"></view>
+        </view>
       </view>
+      <view v-else class="progress-placeholder"></view>
     </view>
 
     <view class="grid-area">
@@ -50,6 +52,17 @@
 
     <view class="ad-area">
       <text class="ad-placeholder">广告区域</text>
+    </view>
+
+    <view v-if="phase === 'countdown' || phase === 'ready'" class="countdown-overlay">
+      <view class="countdown-content">
+        <view v-if="phase === 'countdown'" class="countdown-circle">
+          <text class="countdown-num" :style="{ color: countdownColor }" :key="countdown">{{ countdown }}</text>
+        </view>
+        <view v-else class="ready-content">
+          <text class="ready-text">开始</text>
+        </view>
+      </view>
     </view>
 
     <view v-if="showExitModal" class="modal-mask" @tap="showExitModal = false">
@@ -90,6 +103,7 @@ const elapsedMs = ref(0)
 const timerInterval = ref(null)
 const cdIntervalRef = ref(null)
 const showExitModal = ref(false)
+const isReady = ref(false)
 
 const countdownColor = computed(() => {
   return MACARON_COLORS[countdown.value % MACARON_COLORS.length]
@@ -161,9 +175,12 @@ function startCountdown() {
     if (countdown.value <= 0) {
       clearInterval(cdIntervalRef.value)
       cdIntervalRef.value = null
-      phase.value = 'playing'
-      startTime.value = Date.now()
-      startTimer()
+      phase.value = 'ready'
+      setTimeout(() => {
+        phase.value = 'playing'
+        startTime.value = Date.now()
+        startTimer()
+      }, 800)
     }
   }, 1000)
 }
@@ -247,6 +264,17 @@ onUnmounted(() => {
   50% { text-shadow: 0 0 20rpx rgba(107, 93, 122, 0.6); }
 }
 
+@keyframes readyFadeIn {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes readyFadeOut {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
 .training-page {
   min-height: 100vh;
   background-color: $bg-color;
@@ -306,30 +334,38 @@ onUnmounted(() => {
 }
 
 .progress-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   padding: 0 $spacing-lg $spacing-md;
+  min-height: 56rpx;
 
-  .progress-text {
-    font-size: 16rpx;
-    color: $gray-text;
-    margin-bottom: $spacing-xs;
+  .progress-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    .progress-text {
+      font-size: 16rpx;
+      color: $gray-text;
+      margin-bottom: $spacing-xs;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8rpx;
+      background-color: #E8E8E8;
+      border-radius: 4rpx;
+      overflow: hidden;
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, $purple-light, $purple-deep);
+        border-radius: 4rpx;
+        transition: width 0.2s ease;
+      }
+    }
   }
 
-  .progress-bar {
-    width: 100%;
-    height: 8rpx;
-    background-color: #E8E8E8;
-    border-radius: 4rpx;
-    overflow: hidden;
-
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, $purple-light, $purple-deep);
-      border-radius: 4rpx;
-      transition: width 0.2s ease;
-    }
+  .progress-placeholder {
+    height: 56rpx;
   }
 }
 
@@ -430,6 +466,54 @@ onUnmounted(() => {
     .modal-actions {
       display: flex;
       gap: 24rpx;
+    }
+  }
+}
+
+.countdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: none;
+
+  .countdown-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .countdown-circle {
+    width: 450rpx;
+    height: 450rpx;
+    border-radius: 50%;
+    background: rgba(232, 224, 240, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: countdownPulse 0.6s ease-out forwards;
+
+    .countdown-num {
+      font-size: 120rpx;
+      font-weight: bold;
+    }
+  }
+
+  .ready-content {
+    animation: readyFadeIn 0.4s ease-out forwards;
+
+    .ready-text {
+      font-size: 64rpx;
+      font-weight: bold;
+      color: $purple-deep;
+      text-shadow: 0 4rpx 16rpx rgba(107, 93, 122, 0.4);
+      animation: readyFadeOut 0.4s ease-out 0.4s forwards;
     }
   }
 }

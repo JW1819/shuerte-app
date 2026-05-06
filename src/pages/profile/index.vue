@@ -3,18 +3,15 @@
     <view class="user-header">
       <view class="user-info">
         <view class="avatar-wrap">
-          <image
-            v-if="userStore.isLogin && userStore.userInfo.avatarUrl"
-            class="avatar"
-            :src="userStore.userInfo.avatarUrl"
-            mode="aspectFill"
-          />
-          <view v-else class="avatar avatar-default">
-            <text>👤</text>
+          <view v-if="userStore.isLogin && userStore.userInfo.avatarUrl && isUrl(userStore.userInfo.avatarUrl)" class="avatar avatar-url">
+            <image class="avatar-img" :src="userStore.userInfo.avatarUrl" mode="aspectFill" />
+          </view>
+          <view v-else class="avatar avatar-emoji-wrap">
+            <text class="avatar-emoji-text">{{ userStore.isLogin && userStore.userInfo.avatarUrl ? userStore.userInfo.avatarUrl : '👤' }}</text>
           </view>
         </view>
         <view class="user-detail">
-          <text class="nickname">{{ userStore.userInfo.nickName }}</text>
+          <text class="nickname">{{ userStore.userInfo.nickName || '游客' }}</text>
           <text class="user-status">{{ userStore.isLogin ? '已登录' : '游客模式' }}</text>
         </view>
       </view>
@@ -50,31 +47,59 @@
     <view class="calendar-area">
       <view class="calendar-header">
         <text class="section-title">签到日历</text>
-        <text class="calendar-month">{{ currentMonth }}</text>
+        <view class="calendar-nav">
+          <view class="nav-btn" @tap="prevMonth">
+            <text>‹</text>
+          </view>
+          <text class="calendar-month">{{ currentMonthText }}</text>
+          <view class="nav-btn" @tap="nextMonth">
+            <text>›</text>
+          </view>
+        </view>
       </view>
-      <scroll-view class="calendar-scroll" scroll-x>
-        <view class="calendar-grid">
+      <view class="calendar-weekdays">
+        <text v-for="day in weekdays" :key="day" class="weekday">{{ day }}</text>
+      </view>
+      <view class="calendar-grid">
+        <view
+          v-for="(week, weekIdx) in calendarWeeks"
+          :key="weekIdx"
+          class="calendar-week"
+        >
           <view
-            v-for="day in last30Days"
+            v-for="day in week"
             :key="day.date"
             class="calendar-day"
             :class="{
-              'day-signed': userStore.signLog.includes(day.date),
+              'day-signed': day.date && userStore.signLog.includes(day.date),
               'day-today': day.isToday && !userStore.signLog.includes(day.date),
               'day-today-signed': day.isToday && userStore.signLog.includes(day.date),
-              'day-future': day.isFuture
+              'day-future': day.isFuture,
+              'day-other-month': !day.isCurrentMonth
             }"
             @tap="handleCalendarTap(day)"
           >
-            <text class="day-text">{{ day.dayNum }}</text>
+            <text v-if="day.date" class="day-text">{{ day.dayNum }}</text>
+            <view v-if="day.date && userStore.signLog.includes(day.date)" class="day-checkmark">✓</view>
           </view>
         </view>
-      </scroll-view>
+      </view>
+      <view class="calendar-stats">
+        <view class="stat-item">
+          <text class="stat-num">{{ signedCount }}</text>
+          <text class="stat-label">本月签到</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-item">
+          <text class="stat-num">{{ userStore.continuousSign }}</text>
+          <text class="stat-label">连续签到</text>
+        </view>
+      </view>
     </view>
 
     <view class="best-area">
       <text class="section-title">各难度历史最佳</text>
-      <scroll-view class="best-scroll" scroll-x>
+      <view class="best-grid">
         <view
           v-for="lv in levels"
           :key="lv"
@@ -83,7 +108,7 @@
           @tap="handleBestCardTap(lv)"
         >
           <text class="best-level" :style="{ color: levelConfig[lv].textColor }">{{ lv }}×{{ lv }}</text>
-          <template v-if="userStore.getBestTime(lv)">
+          <template v-if="userStore.hasBestRecord(lv)">
             <text class="best-time">{{ formatTime(userStore.getBestTime(lv) || 0) }}秒</text>
             <view class="best-bottom">
               <text class="best-error">{{ userStore.getBestError(lv) }}次错误</text>
@@ -95,7 +120,7 @@
             <text class="best-no-record">暂无记录</text>
           </view>
         </view>
-      </scroll-view>
+      </view>
     </view>
 
     <view class="footer-area">
@@ -134,12 +159,10 @@
         <view class="login-form">
           <view class="avatar-section">
             <text class="form-label">选择头像</text>
-            <button class="avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
-              <image v-if="loginAvatarUrl" class="avatar-preview" :src="loginAvatarUrl" mode="aspectFill" />
-              <view v-else class="avatar-placeholder">
-                <text>👤</text>
-              </view>
-            </button>
+            <view class="avatar-btn" @tap="switchAvatar">
+              <text class="avatar-emoji">{{ avatarEmojis[currentAvatarIndex] }}</text>
+            </view>
+            <text class="avatar-hint">点击切换头像</text>
           </view>
           <view class="nickname-section">
             <text class="form-label">输入昵称</text>
@@ -150,7 +173,7 @@
           <view class="btn btn-gray" @tap="cancelLogin">
             <text>取消</text>
           </view>
-          <view class="btn btn-purple" @tap="confirmLogin">
+          <view class="btn btn-purple" @tap="() => confirmLogin(avatarEmojis[currentAvatarIndex])">
             <text>确认登录</text>
           </view>
         </view>
@@ -170,39 +193,129 @@ const userStore = useUserStore()
 const levels = [3, 4, 5, 6, 7, 8]
 const levelConfig = LEVEL_CONFIG
 const showLogoutModal = ref(false)
+const avatarEmojis = ['👤', '👩', '👨', '👧', '👦', '👩‍🦰', '👨‍🦰', '👩‍🦳', '👨‍🦳', '🧑']
+const currentAvatarIndex = ref(0)
+
+const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+const today = getToday()
+const todayParts = today.split('-')
+const currentYear = ref(parseInt(todayParts[0]))
+const currentMonth = ref(parseInt(todayParts[1]))
 
 const {
   showLoginDialog,
-  loginAvatarUrl,
   loginNickName,
   openLoginDialog,
-  onChooseAvatar,
   onNicknameInput,
   confirmLogin,
   cancelLogin
 } = useLogin()
 
-const today = getToday()
-const allDays = getLast30Days()
+function switchAvatar() {
+  currentAvatarIndex.value = (currentAvatarIndex.value + 1) % avatarEmojis.length
+}
 
-const currentMonth = computed(() => {
-  const todayParts = today.split('-')
-  return `${todayParts[0]}年${parseInt(todayParts[1])}月`
+function isUrl(str) {
+  try {
+    new URL(str)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const currentMonthText = computed(() => {
+  return `${currentYear.value}年${currentMonth.value}月`
 })
 
-const last30Days = computed(() => {
-  return allDays.map(date => {
-    const parts = date.split('-')
-    return {
-      date,
-      dayNum: parseInt(parts[2]),
-      isToday: date === today,
-      isFuture: date > today
+const calendarWeeks = computed(() => {
+  const weeks = []
+  const firstDay = new Date(currentYear.value, currentMonth.value - 1, 1)
+  const lastDay = new Date(currentYear.value, currentMonth.value, 0)
+  const startDayOfWeek = firstDay.getDay()
+  const totalDays = lastDay.getDate()
+  const todayDate = new Date(parseInt(todayParts[0]), parseInt(todayParts[1]) - 1, parseInt(todayParts[2]))
+  const signLog = userStore.signLog
+
+  let week = []
+  
+  for (let i = startDayOfWeek - 1; i >= 0; i--) {
+    const d = new Date(currentYear.value, currentMonth.value - 1, -i)
+    week.push({
+      date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+      dayNum: d.getDate(),
+      isToday: false,
+      isFuture: false,
+      isCurrentMonth: false
+    })
+  }
+
+  for (let day = 1; day <= totalDays; day++) {
+    const d = new Date(currentYear.value, currentMonth.value - 1, day)
+    const dateStr = `${currentYear.value}-${String(currentMonth.value).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    const isToday = d.toDateString() === todayDate.toDateString()
+    const isFuture = d > todayDate
+    
+    week.push({
+      date: dateStr,
+      dayNum: day,
+      isToday,
+      isFuture,
+      isCurrentMonth: true
+    })
+
+    if (week.length === 7) {
+      weeks.push(week)
+      week = []
     }
-  })
+  }
+
+  if (week.length > 0) {
+    while (week.length < 7) {
+      const d = new Date(currentYear.value, currentMonth.value, week.length)
+      week.push({
+        date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+        dayNum: d.getDate(),
+        isToday: false,
+        isFuture: false,
+        isCurrentMonth: false
+      })
+    }
+    weeks.push(week)
+  }
+
+  return weeks
 })
+
+const signedCount = computed(() => {
+  const year = currentYear.value
+  const month = String(currentMonth.value).padStart(2, '0')
+  return userStore.signLog.filter(date => date.startsWith(`${year}-${month}`)).length
+})
+
+function prevMonth() {
+  if (currentMonth.value === 1) {
+    currentYear.value -= 1
+    currentMonth.value = 12
+  } else {
+    currentMonth.value -= 1
+  }
+}
+
+function nextMonth() {
+  if (currentMonth.value === 12) {
+    currentYear.value += 1
+    currentMonth.value = 1
+  } else {
+    currentMonth.value += 1
+  }
+}
 
 function handleCalendarTap(day) {
+  if (!userStore.isLogin) {
+    openLoginDialog()
+    return
+  }
   if (day.isToday && !userStore.signLog.includes(day.date)) {
     userStore.signIn()
     Taro.showToast({ title: '签到成功', icon: 'none', duration: 3000 })
@@ -214,9 +327,8 @@ function handleBestCardTap(lv) {
     openLoginDialog()
     return
   }
-  Taro.showToast({
-    title: `${lv}×${lv} 难度`,
-    icon: 'none'
+  Taro.navigateTo({
+    url: `/pages/training/index?level=${lv}`
   })
 }
 
@@ -299,12 +411,24 @@ function getRatingClass(time, level) {
         border: 4rpx solid rgba(255, 255, 255, 0.6);
         box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.08);
 
-        &.avatar-default {
+        &.avatar-url {
+          overflow: hidden;
+
+          .avatar-img {
+            width: 100%;
+            height: 100%;
+          }
+        }
+
+        &.avatar-emoji-wrap {
           background-color: rgba(255, 255, 255, 0.8);
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 44rpx;
+
+          .avatar-emoji-text {
+            font-size: 40rpx;
+          }
         }
       }
     }
@@ -328,17 +452,20 @@ function getRatingClass(time, level) {
   }
 
   .login-btn {
-    padding: $spacing-xs $spacing-md;
+    padding: $spacing-sm $spacing-lg;
     background-color: rgba(255, 255, 255, 0.9);
     border-radius: $radius-btn;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     &:active {
       transform: scale(0.96);
     }
 
     .login-text {
-      font-size: 14rpx;
+      font-size: 24rpx;
       font-weight: bold;
       color: $purple-light;
     }
@@ -405,123 +532,237 @@ function getRatingClass(time, level) {
 
 .calendar-area {
   padding: $spacing-md $spacing-lg;
+  background-color: #FFFFFF;
+  margin: 0 $spacing-md $spacing-md;
+  border-radius: $radius-card;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 
   .calendar-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: $spacing-md;
+    padding: $spacing-sm 0;
   }
 
   .section-title {
-    font-size: 16rpx;
+    font-size: 24rpx;
     font-weight: bold;
     color: $purple-deep;
     display: block;
   }
 
-  .calendar-month {
-    font-size: 14rpx;
-    color: $gray-text;
-  }
-
-  .calendar-scroll {
-    white-space: nowrap;
-  }
-
-  .calendar-grid {
+  .calendar-nav {
     display: flex;
-    gap: $spacing-xs;
+    align-items: center;
+    gap: $spacing-md;
 
-    .calendar-day {
-      width: 40rpx;
-      height: 40rpx;
-      border-radius: $radius-btn;
+    .nav-btn {
+      width: 44rpx;
+      height: 44rpx;
       display: flex;
       align-items: center;
       justify-content: center;
-      background-color: #F0F0F0;
-      flex-shrink: 0;
-      transition: all 0.2s ease;
+      border-radius: 50%;
+      background-color: $purple-bg;
+      transition: all 0.2s;
 
-      .day-text {
-        font-size: 14rpx;
+      &:active {
+        transform: scale(0.9);
+        background-color: $purple-light;
+      }
+
+      text {
+        font-size: 32rpx;
+        color: $purple-deep;
+        line-height: 1;
+      }
+    }
+
+    .calendar-month {
+      font-size: 24rpx;
+      color: $text-dark;
+      font-weight: bold;
+      min-width: 160rpx;
+      text-align: center;
+    }
+  }
+
+  .calendar-weekdays {
+    display: flex;
+    padding: $spacing-sm 0;
+    border-bottom: 1rpx solid #F0E8E0;
+
+    .weekday {
+      flex: 1;
+      text-align: center;
+      font-size: 20rpx;
+      color: $gray-text;
+      font-weight: bold;
+    }
+  }
+
+  .calendar-grid {
+    padding: $spacing-sm 0;
+
+    .calendar-week {
+      display: flex;
+
+      .calendar-day {
+        flex: 1;
+        height: 72rpx;
+        border-radius: $radius-btn;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: transparent;
+        border: 2rpx solid transparent;
+        transition: all 0.2s ease;
+        position: relative;
+
+        .day-text {
+          font-size: 22rpx;
+          color: $text-dark;
+        }
+
+        .day-checkmark {
+          position: absolute;
+          bottom: 4rpx;
+          right: 8rpx;
+          font-size: 14rpx;
+          color: white;
+          font-weight: bold;
+        }
+
+        &.day-signed {
+          background: linear-gradient(135deg, $orange-bg, #FF9A6B);
+          border-color: $orange-bg;
+          animation: signSuccess 0.6s ease-out;
+
+          .day-text {
+            color: white;
+            font-weight: bold;
+          }
+        }
+
+        &.day-today {
+          background-color: $purple-bg;
+          border-color: $purple-light;
+
+          .day-text {
+            color: white;
+            font-weight: bold;
+          }
+        }
+
+        &.day-today-signed {
+          background: linear-gradient(135deg, $orange-bg, #FF9A6B);
+          border-color: $orange-bg;
+          animation: signSuccess 0.6s ease-out;
+
+          .day-text {
+            color: white;
+            font-weight: bold;
+          }
+        }
+
+        &.day-future {
+          opacity: 0.4;
+          pointer-events: none;
+
+          .day-text {
+            color: $gray-light;
+          }
+        }
+
+        &.day-other-month {
+          opacity: 0.3;
+
+          .day-text {
+            color: $gray-light;
+          }
+        }
+
+        &:active:not(.day-signed):not(.day-future):not(.day-other-month) {
+          transform: scale(0.95);
+          background-color: $purple-bg;
+          border-color: $purple-bg;
+
+          .day-text {
+            color: white;
+          }
+        }
+      }
+    }
+  }
+
+  .calendar-stats {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: $spacing-lg;
+    padding: $spacing-md 0 $spacing-sm;
+    margin-top: $spacing-sm;
+    border-top: 1rpx solid #F0E8E0;
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+
+      .stat-num {
+        font-size: 32rpx;
+        font-weight: bold;
+        color: $purple-deep;
+      }
+
+      .stat-label {
+        font-size: 18rpx;
         color: $gray-text;
+        margin-top: 4rpx;
       }
+    }
 
-      &.day-signed {
-        background-color: $orange-bg;
-        animation: signSuccess 0.6s ease-out;
-
-        .day-text {
-          color: white;
-        }
-      }
-
-      &.day-today {
-        background-color: $purple-bg;
-        border: 2rpx solid $purple-light;
-
-        .day-text {
-          color: white;
-          font-weight: bold;
-        }
-      }
-
-      &.day-today-signed {
-        background-color: $orange-bg;
-        border: 2rpx solid $orange-bg;
-        animation: signSuccess 0.6s ease-out;
-
-        .day-text {
-          color: white;
-          font-weight: bold;
-        }
-      }
-
-      &.day-future {
-        opacity: 0.4;
-        pointer-events: none;
-
-        .day-text {
-          color: $gray-light;
-        }
-      }
-
-      &:active:not(.day-signed):not(.day-future) {
-        transform: scale(0.95);
-        background-color: $purple-bg;
-      }
+    .stat-divider {
+      width: 1rpx;
+      height: 40rpx;
+      background-color: #F0E8E0;
     }
   }
 }
 
 .best-area {
   padding: $spacing-md $spacing-lg;
+  margin-top: $spacing-md;
+  background-color: #FFFFFF;
+  margin: $spacing-md;
+  border-radius: $radius-card;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 
   .section-title {
-    font-size: 16rpx;
+    font-size: 24rpx;
     font-weight: bold;
     color: $purple-deep;
     margin-bottom: $spacing-md;
     display: block;
   }
 
-  .best-scroll {
-    white-space: nowrap;
+  .best-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: $spacing-md;
   }
 
   .best-card {
-    display: inline-flex;
+    display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 120rpx;
-    height: 80rpx;
-    padding: $spacing-md $spacing-sm;
-    margin-right: $spacing-md;
-    flex-shrink: 0;
-    transition: all 0.2s;
+    height: 120rpx;
+    padding: $spacing-sm;
+    border-radius: $radius-card;
+    transition: all 0.25s;
+    box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
+    border: 2rpx solid transparent;
 
     &:active {
       transform: scale(0.96);
@@ -529,19 +770,19 @@ function getRatingClass(time, level) {
     }
 
     .best-level {
-      font-size: 16rpx;
+      font-size: 26rpx;
       font-weight: bold;
     }
 
     .best-time {
-      font-size: 14rpx;
+      font-size: 22rpx;
       color: $purple-deep;
       margin-top: $spacing-xs;
       font-weight: bold;
     }
 
     .best-no-record {
-      font-size: 12rpx;
+      font-size: 16rpx;
       color: $gray-text;
       margin-top: $spacing-xs;
     }
@@ -556,34 +797,39 @@ function getRatingClass(time, level) {
     }
 
     .best-error {
-      font-size: 12rpx;
+      font-size: 14rpx;
       color: $red-light;
+      opacity: 0.8;
     }
 
     .best-rating {
-      font-size: 14rpx;
+      font-size: 16rpx;
       font-weight: bold;
-      padding: 2rpx 8rpx;
-      border-radius: 6rpx;
+      padding: 4rpx 10rpx;
+      border-radius: 8rpx;
 
       &.rating-S {
-        background-color: #FFD700;
+        background: linear-gradient(135deg, #FFD700, #FFA500);
         color: #8B4513;
+        box-shadow: 0 2rpx 8rpx rgba(255, 215, 0, 0.3);
       }
 
       &.rating-A {
-        background-color: #5B9BD5;
+        background: linear-gradient(135deg, #5B9BD5, #3A7BC8);
         color: white;
+        box-shadow: 0 2rpx 8rpx rgba(91, 155, 213, 0.3);
       }
 
       &.rating-B {
-        background-color: #C4A830;
+        background: linear-gradient(135deg, #C4A830, #A08020);
         color: white;
+        box-shadow: 0 2rpx 8rpx rgba(196, 168, 48, 0.3);
       }
 
       &.rating-C {
-        background-color: #D45B5B;
+        background: linear-gradient(135deg, #D45B5B, #B04040);
         color: white;
+        box-shadow: 0 2rpx 8rpx rgba(212, 91, 91, 0.3);
       }
 
       &.rating-- {
@@ -681,6 +927,77 @@ function getRatingClass(time, level) {
       display: flex;
       gap: 24rpx;
       margin-top: 20rpx;
+    }
+
+    .login-form {
+      width: 100%;
+
+      .avatar-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 32rpx;
+
+        .form-label {
+          font-size: 14rpx;
+          color: $gray-text;
+          margin-bottom: 16rpx;
+        }
+
+        .avatar-btn {
+          width: 100rpx;
+          height: 100rpx;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #E8E0F0, #F0E8F8);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 4rpx solid rgba(255, 255, 255, 0.8);
+          box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+          transition: all 0.2s;
+
+          &:active {
+            transform: scale(0.95);
+          }
+
+          .avatar-emoji {
+            font-size: 48rpx;
+          }
+        }
+
+        .avatar-hint {
+          font-size: 12rpx;
+          color: $gray-light;
+          margin-top: 8rpx;
+        }
+      }
+
+      .nickname-section {
+        display: flex;
+        flex-direction: column;
+
+        .form-label {
+          font-size: 14rpx;
+          color: $gray-text;
+          margin-bottom: 12rpx;
+        }
+
+        .nickname-input {
+          width: 100%;
+          height: 80rpx;
+          border-radius: $radius-btn;
+          background-color: #F8F8F8;
+          padding: 0 24rpx;
+          font-size: 16rpx;
+          border: 2rpx solid #F0E8E0;
+          box-sizing: border-box;
+
+          &:focus {
+            border-color: $purple-light;
+            background-color: #FFFFFF;
+          }
+        }
+      }
     }
   }
 }

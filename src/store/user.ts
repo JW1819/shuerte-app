@@ -42,9 +42,21 @@ export const useUserStore = defineStore('user', () => {
         totalTime.value = storedUser.totalTime || 0
         lastSignDate.value = storedUser.lastSignDate || ''
       }
-      if (storedScores) scores.value = storedScores
-      if (storedSignLog) signLog.value = storedSignLog
-      if (storedGameLog) gameLog.value = storedGameLog
+      if (storedScores && typeof storedScores === 'object') {
+        scores.value = storedScores
+      } else {
+        scores.value = {}
+      }
+      if (Array.isArray(storedSignLog)) {
+        signLog.value = storedSignLog
+      } else {
+        signLog.value = []
+      }
+      if (Array.isArray(storedGameLog)) {
+        gameLog.value = storedGameLog
+      } else {
+        gameLog.value = []
+      }
     } catch (e) {
       console.error('loadFromStorage error', e)
     }
@@ -113,11 +125,19 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function getBestTime(level: number): number | null {
-    return scores.value[level]?.bestTime ?? null
+    const score = scores.value[level]
+    if (!score) return null
+    return score.bestTime
   }
 
   function getBestError(level: number): number | null {
-    return scores.value[level]?.bestError ?? null
+    const score = scores.value[level]
+    if (!score) return null
+    return score.bestError
+  }
+
+  function hasBestRecord(level: number): boolean {
+    return !!scores.value[level]
   }
 
   function login(nickName: string, avatarUrl: string) {
@@ -170,6 +190,7 @@ export const useUserStore = defineStore('user', () => {
     saveGameResult,
     getBestTime,
     getBestError,
+    hasBestRecord,
     login,
     logout,
     loadFromStorage,

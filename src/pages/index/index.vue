@@ -41,7 +41,7 @@
     <view class="shortcut-area">
       <view class="shortcut-item" @tap="goRanking">
         <text class="shortcut-icon">🏆</text>
-        <text class="shortcut-text">排行榜</text>
+        <text class="shortcut-text">排行榜1</text>
       </view>
       <view class="shortcut-item" @tap="goProfile">
         <text class="shortcut-icon">📋</text>
@@ -161,13 +161,13 @@ function goProfile() {
   padding: $spacing-xl 0 $spacing-lg;
 
   .welcome-title {
-    font-size: 24rpx;
+    font-size: 40rpx;
     font-weight: bold;
     color: $purple-deep;
   }
 
   .welcome-subtitle {
-    font-size: 16rpx;
+    font-size: 24rpx;
     color: $purple-light;
     margin-top: $spacing-sm;
   }
@@ -182,15 +182,15 @@ function goProfile() {
   .sign-box {
     background-color: $orange-bg;
     border-radius: $radius-btn;
-    padding: $spacing-sm $spacing-lg;
+    padding: $spacing-md $spacing-xl;
 
     .sign-text {
-      font-size: 14rpx;
+      font-size: 24rpx;
       color: $orange-light;
 
       .sign-days {
         font-weight: bold;
-        font-size: 18rpx;
+        font-size: 28rpx;
       }
     }
   }
@@ -198,11 +198,15 @@ function goProfile() {
 
 .level-area {
   padding: $spacing-md $spacing-lg;
+  display: flex;
+  justify-content: center;
 
   .level-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: $spacing-md;
+    width: 100%;
+    max-width: 560rpx;
   }
 
   .level-card {
@@ -210,10 +214,10 @@ function goProfile() {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: $spacing-lg;
-    width: 160rpx;
-    height: 120rpx;
+    padding: $spacing-lg $spacing-md;
+    min-height: 140rpx;
     border: 2rpx solid transparent;
+    border-radius: $radius-card;
     transition: all 0.2s ease;
     box-sizing: border-box;
 
@@ -222,18 +226,18 @@ function goProfile() {
     }
 
     .level-id {
-      font-size: 22rpx;
+      font-size: 32rpx;
       font-weight: bold;
     }
 
     .level-name {
-      font-size: 14rpx;
+      font-size: 20rpx;
       color: $gray-text;
       margin-top: $spacing-xs;
     }
 
     .level-best {
-      font-size: 12rpx;
+      font-size: 18rpx;
       color: $gray-text;
       margin-top: $spacing-xs;
     }

@@ -88,6 +88,7 @@ function goBack() {
 .content-page {
   min-height: 100vh;
   background-color: $bg-color;
+  box-sizing: border-box;
 }
 .nav-bar {
   display: flex;
@@ -102,6 +103,8 @@ function goBack() {
 .content-body {
   padding: $spacing-lg;
   height: calc(100vh - 84rpx);
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 .feedback-form {
   .form-group {
