@@ -1,0 +1,45 @@
+$bg-color: #FFF8F0;
+$purple-deep: #6B5D7A;
+$purple-light: #8B7DA8;
+$purple-bg: #E8E0F0;
+$orange-light: #D4853A;
+$orange-bg: #FFF0E0;
+$blue-light: #5B9BD5;
+$blue-bg: #E0F0FF;
+$pink-light: #D4739A;
+$pink-bg: #FFE0EC;
+$yellow-light: #C4A830;
+$yellow-bg: #FFF8E0;
+$green-light: #5BAA6F;
+$green-bg: #E0F8E8;
+$red-light: #D45B5B;
+$gray-light: #D0D0D0;
+$gray-text: #777777;
+$text-dark: #4A4A5A;
+$text-light: #888898;
+
+$spacing-xs: 8rpx;
+$spacing-sm: 16rpx;
+$spacing-md: 24rpx;
+$spacing-lg: 32rpx;
+$spacing-xl: 48rpx;
+
+$radius-btn: 12rpx;
+$radius-card: 16rpx;
+$radius-popup: 24rpx;
+
+$level-colors: (
+  3: (bg: #E0F0FF, text: #5B9BD5, border: #A8D4F0, name: "入门"),
+  4: (bg: #FFE0EC, text: #D4739A, border: #F0A8C4, name: "初级"),
+  5: (bg: #FFF8E0, text: #C4A830, border: #F0E0A0, name: "经典"),
+  6: (bg: #E0F8E8, text: #5BAA6F, border: #A0D8B0, name: "高级"),
+  7: (bg: #E8E0F0, text: #8B7DA8, border: #C4B5D9, name: "专家"),
+  8: (bg: #FFF0E0, text: #C88540, border: #F5C89A, name: "大神")
+);
+
+@mixin level-theme($level) {
+  $colors: map-get($level-colors, $level);
+  background-color: map-get($colors, bg);
+  color: map-get($colors, text);
+  border-color: map-get($colors, border);
+}

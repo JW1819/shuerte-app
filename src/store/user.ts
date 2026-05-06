@@ -1,0 +1,179 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import Taro from '@tarojs/taro'
+import { getToday, LEVEL_CONFIG } from '@/utils/index'
+
+const STORAGE_KEYS = {
+  USER: 'shuerte_user',
+  SCORES: 'shuerte_scores',
+  SIGN_LOG: 'shuerte_sign_log',
+  GAME_LOG: 'shuerte_game_log',
+  IS_LOGIN: 'shuerte_is_login',
+  USER_INFO: 'shuerte_user_info'
+}
+
+const MAX_GAME_LOG = 200
+
+export const useUserStore = defineStore('user', () => {
+  const isLogin = ref(false)
+  const userInfo = ref({ nickName: '游客', avatarUrl: '', openId: '' })
+  const continuousSign = ref(0)
+  const totalGameCount = ref(0)
+  const totalTime = ref(0)
+  const lastSignDate = ref('')
+  const signLog = ref<string[]>([])
+  const scores = ref<Record<number, { bestTime: number; bestError: number }>>({})
+  const gameLog = ref<Array<{ level: number; useTime: number; errorCount: number; createTime: string }>>([])
+
+  function loadFromStorage() {
+    try {
+      const storedIsLogin = Taro.getStorageSync(STORAGE_KEYS.IS_LOGIN)
+      const storedUserInfo = Taro.getStorageSync(STORAGE_KEYS.USER_INFO)
+      const storedUser = Taro.getStorageSync(STORAGE_KEYS.USER)
+      const storedScores = Taro.getStorageSync(STORAGE_KEYS.SCORES)
+      const storedSignLog = Taro.getStorageSync(STORAGE_KEYS.SIGN_LOG)
+      const storedGameLog = Taro.getStorageSync(STORAGE_KEYS.GAME_LOG)
+
+      if (storedIsLogin) isLogin.value = storedIsLogin
+      if (storedUserInfo) userInfo.value = storedUserInfo
+      if (storedUser) {
+        continuousSign.value = storedUser.continuousSign || 0
+        totalGameCount.value = storedUser.totalGameCount || 0
+        totalTime.value = storedUser.totalTime || 0
+        lastSignDate.value = storedUser.lastSignDate || ''
+      }
+      if (storedScores) scores.value = storedScores
+      if (storedSignLog) signLog.value = storedSignLog
+      if (storedGameLog) gameLog.value = storedGameLog
+    } catch (e) {
+      console.error('loadFromStorage error', e)
+    }
+  }
+
+  function saveToStorage() {
+    try {
+      Taro.setStorageSync(STORAGE_KEYS.IS_LOGIN, isLogin.value)
+      Taro.setStorageSync(STORAGE_KEYS.USER_INFO, userInfo.value)
+      Taro.setStorageSync(STORAGE_KEYS.USER, {
+        continuousSign: continuousSign.value,
+        totalGameCount: totalGameCount.value,
+        totalTime: totalTime.value,
+        lastSignDate: lastSignDate.value
+      })
+      Taro.setStorageSync(STORAGE_KEYS.SCORES, scores.value)
+      Taro.setStorageSync(STORAGE_KEYS.SIGN_LOG, signLog.value)
+      Taro.setStorageSync(STORAGE_KEYS.GAME_LOG, gameLog.value)
+    } catch (e) {
+      console.error('saveToStorage error', e)
+    }
+  }
+
+  const todaySigned = computed(() => {
+    const today = getToday()
+    return signLog.value.includes(today)
+  })
+
+  function signIn() {
+    const today = getToday()
+    if (signLog.value.includes(today)) return false
+    signLog.value.push(today)
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`
+    if (lastSignDate.value === yesterdayStr) {
+      continuousSign.value += 1
+    } else {
+      continuousSign.value = 1
+    }
+    lastSignDate.value = today
+    saveToStorage()
+    return true
+  }
+
+  function saveGameResult(level: number, useTime: number, errorCount: number) {
+    totalGameCount.value += 1
+    totalTime.value += useTime
+    gameLog.value.push({
+      level,
+      useTime,
+      errorCount,
+      createTime: new Date().toISOString()
+    })
+    if (gameLog.value.length > MAX_GAME_LOG) {
+      gameLog.value = gameLog.value.slice(-MAX_GAME_LOG)
+    }
+    const existing = scores.value[level]
+    if (!existing || useTime < existing.bestTime || (useTime === existing.bestTime && errorCount < existing.bestError)) {
+      scores.value[level] = { bestTime: useTime, bestError: errorCount }
+    }
+    saveToStorage()
+    if (isLogin.value) {
+      syncToCloud()
+    }
+  }
+
+  function getBestTime(level: number): number | null {
+    return scores.value[level]?.bestTime ?? null
+  }
+
+  function getBestError(level: number): number | null {
+    return scores.value[level]?.bestError ?? null
+  }
+
+  function login(nickName: string, avatarUrl: string) {
+    isLogin.value = true
+    userInfo.value = { nickName, avatarUrl, openId: '' }
+    Taro.login({
+      success: (res) => {
+        // TODO: 将 res.code 发送至云函数换取 openId
+        // wx.cloud.callFunction({ name: 'login', data: { code: res.code } })
+      }
+    })
+    saveToStorage()
+    syncToCloud()
+  }
+
+  function syncToCloud() {
+    // TODO: 接入微信云开发后实现数据同步
+    // wx.cloud.callFunction({
+    //   name: 'syncData',
+    //   data: {
+    //     scores: scores.value,
+    //     continuousSign: continuousSign.value,
+    //     totalGameCount: totalGameCount.value,
+    //     totalTime: totalTime.value,
+    //     signLog: signLog.value
+    //   }
+    // })
+  }
+
+  function logout() {
+    isLogin.value = false
+    userInfo.value = { nickName: '游客', avatarUrl: '', openId: '' }
+    saveToStorage()
+  }
+
+  loadFromStorage()
+
+  return {
+    isLogin,
+    userInfo,
+    continuousSign,
+    totalGameCount,
+    totalTime,
+    lastSignDate,
+    signLog,
+    scores,
+    gameLog,
+    todaySigned,
+    signIn,
+    saveGameResult,
+    getBestTime,
+    getBestError,
+    login,
+    logout,
+    loadFromStorage,
+    saveToStorage,
+    syncToCloud
+  }
+})
