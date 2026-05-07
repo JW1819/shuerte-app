@@ -9,31 +9,50 @@ export function useLogin() {
   const loginNickName = ref('')
 
   function openLoginDialog() {
-    loginAvatarUrl.value = userStore.userInfo.avatarUrl || ''
-    loginNickName.value = userStore.userInfo.nickName !== '游客' ? userStore.userInfo.nickName : ''
+    loginAvatarUrl.value = (userStore.userInfo && userStore.userInfo.avatarUrl) || ''
+    loginNickName.value = (userStore.userInfo && userStore.userInfo.nickName !== '游客') ? userStore.userInfo.nickName : ''
     showLoginDialog.value = true
   }
 
   function onChooseAvatar(e) {
-    const avatarUrl = e.detail?.avatarUrl || e.detail?.tempFilePath || ''
-    if (avatarUrl) {
-      loginAvatarUrl.value = avatarUrl
-    } else {
+    var detail = e.detail || {}
+    var avatarUrl = detail.avatarUrl || detail.tempFilePath || ''
+    if (!avatarUrl) {
       Taro.showToast({ title: '选择头像失败', icon: 'none' })
+      return
     }
+    if (!avatarUrl.startsWith('http') && !avatarUrl.startsWith('wxfile://')) {
+      Taro.showToast({ title: '头像路径无效', icon: 'none' })
+      return
+    }
+    async function saveAvatar(tempPath) {
+      try {
+        const fileInfo = await Taro.getFileInfo({ filePath: tempPath })
+        if (!fileInfo.size) throw new Error('文件无效')
+        const res = await Taro.saveFile({ tempFilePath: tempPath })
+        loginAvatarUrl.value = res.savedFilePath
+        console.log('头像保存成功:', res.savedFilePath)
+      } catch (err) {
+        console.error('头像保存失败:', err)
+        loginAvatarUrl.value = tempPath
+        Taro.showToast({ title: '头像保存失败，已使用临时路径', icon: 'none' })
+        console.log('头像保存失败，使用临时路径:', tempPath)
+      }
+    }
+    saveAvatar(avatarUrl)
   }
 
   function onNicknameInput(e) {
     loginNickName.value = e.detail.value
   }
 
-  function confirmLogin(avatar = '') {
+  function confirmLogin() {
     if (!loginNickName.value.trim()) {
       Taro.showToast({ title: '请输入昵称', icon: 'none' })
       return false
     }
-    const finalAvatar = avatar || loginAvatarUrl.value
-    userStore.login(loginNickName.value.trim(), finalAvatar)
+    console.log('登录头像URL:', loginAvatarUrl.value)
+    userStore.login(loginNickName.value.trim(), loginAvatarUrl.value)
     showLoginDialog.value = false
     Taro.showToast({ title: '登录成功', icon: 'none' })
     return true

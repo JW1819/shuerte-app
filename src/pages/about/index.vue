@@ -60,9 +60,9 @@ function goBack() {
   justify-content: space-between;
   padding: 20rpx $spacing-lg;
   height: 44rpx;
-  .nav-left { .back-icon { font-size: 32rpx; color: $gray-light; } }
-  .nav-title { font-size: 18rpx; font-weight: bold; color: $purple-deep; }
-  .nav-right { width: 32rpx; }
+  .nav-left { .back-icon { font-size: 40rpx; color: $gray-light; } }
+  .nav-title { font-size: 32rpx; font-weight: bold; color: $purple-deep; }
+  .nav-right { width: 40rpx; }
 }
 .content-body {
   padding: $spacing-lg;
@@ -76,23 +76,23 @@ function goBack() {
   align-items: center;
   padding: $spacing-xl 0;
   margin-bottom: $spacing-lg;
-  .app-icon { font-size: 60rpx; margin-bottom: $spacing-md; }
-  .app-name { font-size: 22rpx; font-weight: bold; color: $purple-deep; }
-  .app-version { font-size: 14rpx; color: $gray-text; margin-top: $spacing-xs; }
+  .app-icon { font-size: 80rpx; margin-bottom: $spacing-md; }
+  .app-name { font-size: 36rpx; font-weight: bold; color: $purple-deep; }
+  .app-version { font-size: 24rpx; color: $gray-text; margin-top: $spacing-xs; }
 }
 .content-section {
-  margin-bottom: $spacing-lg;
+  margin-bottom: $spacing-xl;
   .section-heading {
-    font-size: 16rpx;
+    font-size: 30rpx;
     font-weight: bold;
     color: $purple-deep;
     display: block;
-    margin-bottom: $spacing-sm;
+    margin-bottom: $spacing-md;
   }
   .section-text {
-    font-size: 14rpx;
+    font-size: 28rpx;
     color: $text-dark;
-    line-height: 1.8;
+    line-height: 2;
     display: block;
     white-space: pre-line;
   }

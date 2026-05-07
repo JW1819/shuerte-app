@@ -2,7 +2,7 @@
   "miniprogramRoot": "dist/",
   "projectname": "shuerte",
   "description": "舒尔特方格专注力训练小程序",
-  "appid": "touristappid",
+  "appid": "wx26c00e4f849eb955",
   "setting": {
     "urlCheck": false,
     "es6": false,

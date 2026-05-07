@@ -122,11 +122,14 @@ function goBack() {
     flex-wrap: wrap;
     gap: $spacing-sm;
     .type-item {
-      padding: 8rpx 20rpx;
+      padding: 16rpx 32rpx;
       border-radius: $radius-btn;
       background-color: #F0F0F0;
       transition: all 0.2s;
-      .type-text { font-size: 14rpx; color: $gray-text; }
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      .type-text { font-size: 28rpx; color: $gray-text; }
       &.type-active {
         background-color: $purple-bg;
         .type-text { color: white; font-weight: bold; }
@@ -166,6 +169,16 @@ function goBack() {
     margin-top: $spacing-xl;
     width: 100%;
     text-align: center;
+    
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      
+      text {
+        font-size: 28rpx;
+      }
+    }
   }
 }
 </style>

@@ -34,8 +34,25 @@ export const useUserStore = defineStore('user', () => {
       const storedSignLog = Taro.getStorageSync(STORAGE_KEYS.SIGN_LOG)
       const storedGameLog = Taro.getStorageSync(STORAGE_KEYS.GAME_LOG)
 
-      if (storedIsLogin) isLogin.value = storedIsLogin
-      if (storedUserInfo) userInfo.value = storedUserInfo
+      if (storedIsLogin && typeof storedIsLogin === 'boolean') isLogin.value = storedIsLogin
+      if (storedUserInfo && typeof storedUserInfo === 'object') {
+        const storedNickName = storedUserInfo.nickName
+        const storedAvatar = storedUserInfo.avatarUrl
+        const storedOpenId = storedUserInfo.openId
+        if (storedUser && typeof storedUser === 'object' && storedUser.openId && !storedOpenId) {
+          userInfo.value = {
+            nickName: String(storedNickName || storedUser.nickName || '游客'),
+            avatarUrl: String(storedAvatar || storedUser.avatarUrl || ''),
+            openId: String(storedUser.openId || '')
+          }
+        } else {
+          userInfo.value = {
+            nickName: String(storedNickName || '游客'),
+            avatarUrl: String(storedAvatar || ''),
+            openId: String(storedOpenId || '')
+          }
+        }
+      }
       if (storedUser) {
         continuousSign.value = storedUser.continuousSign || 0
         totalGameCount.value = storedUser.totalGameCount || 0

@@ -2,9 +2,7 @@
   <view class="home-page">
     <view class="nav-bar">
       <view class="nav-left"></view>
-      <view class="nav-right" @tap="goProfile">
-        <text class="nav-icon">👤</text>
-      </view>
+      <view class="nav-right"></view>
     </view>
 
     <view class="welcome-area">
@@ -41,7 +39,7 @@
     <view class="shortcut-area">
       <view class="shortcut-item" @tap="goRanking">
         <text class="shortcut-icon">🏆</text>
-        <text class="shortcut-text">排行榜1</text>
+        <text class="shortcut-text">排行榜</text>
       </view>
       <view class="shortcut-item" @tap="goProfile">
         <text class="shortcut-icon">📋</text>
@@ -155,23 +153,23 @@ function goProfile() {
 }
 
 .welcome-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: $spacing-xl 0 $spacing-lg;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: $spacing-xl 0 $spacing-lg;
 
-  .welcome-title {
-    font-size: 40rpx;
-    font-weight: bold;
-    color: $purple-deep;
-  }
+    .welcome-title {
+      font-size: 56rpx;
+      font-weight: bold;
+      color: $purple-deep;
+    }
 
-  .welcome-subtitle {
-    font-size: 24rpx;
-    color: $purple-light;
-    margin-top: $spacing-sm;
+    .welcome-subtitle {
+      font-size: 28rpx;
+      color: $purple-light;
+      margin-top: $spacing-sm;
+    }
   }
-}
 
 .sign-area {
   display: flex;
@@ -185,12 +183,12 @@ function goProfile() {
     padding: $spacing-md $spacing-xl;
 
     .sign-text {
-      font-size: 24rpx;
+      font-size: 28rpx;
       color: $orange-light;
 
       .sign-days {
         font-weight: bold;
-        font-size: 28rpx;
+        font-size: 36rpx;
       }
     }
   }
@@ -203,10 +201,9 @@ function goProfile() {
 
   .level-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 160rpx 160rpx 160rpx;
     gap: $spacing-md;
-    width: 100%;
-    max-width: 560rpx;
+    justify-content: center;
   }
 
   .level-card {
@@ -214,8 +211,9 @@ function goProfile() {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: $spacing-lg $spacing-md;
-    min-height: 140rpx;
+    padding: $spacing-md;
+    width: 160rpx;
+    height: 180rpx;
     border: 2rpx solid transparent;
     border-radius: $radius-card;
     transition: all 0.2s ease;
@@ -226,20 +224,22 @@ function goProfile() {
     }
 
     .level-id {
-      font-size: 32rpx;
+      font-size: 36rpx;
       font-weight: bold;
     }
 
     .level-name {
-      font-size: 20rpx;
+      font-size: 24rpx;
       color: $gray-text;
       margin-top: $spacing-xs;
     }
 
     .level-best {
-      font-size: 18rpx;
+      font-size: 22rpx;
       color: $gray-text;
       margin-top: $spacing-xs;
+      white-space: nowrap;
+      display: inline-block;
     }
   }
 }

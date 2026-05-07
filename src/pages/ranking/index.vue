@@ -154,12 +154,11 @@ const currentAvatarIndex = ref(0)
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 
-const listBodyHeight = computed(() => {
-  return 'calc(100vh - 420rpx)'
-})
+const listBodyHeight = ref('500rpx')
 
 const {
   showLoginDialog,
+  loginAvatarUrl,
   loginNickName,
   openLoginDialog,
   onNicknameInput,
@@ -169,10 +168,11 @@ const {
 
 function switchAvatar() {
   currentAvatarIndex.value = (currentAvatarIndex.value + 1) % avatarEmojis.length
+  loginAvatarUrl.value = avatarEmojis[currentAvatarIndex.value]
 }
 
 function handleLoginConfirm() {
-  if (confirmLogin(avatarEmojis[currentAvatarIndex.value])) {
+  if (confirmLogin()) {
     loadRanking()
   }
 }
@@ -242,6 +242,10 @@ function onRefresh() {
 }
 
 onMounted(() => {
+  const systemInfo = Taro.getSystemInfoSync()
+  const screenHeight = systemInfo.windowHeight || 667
+  listBodyHeight.value = `${screenHeight * 2 - 420}rpx`
+  
   if (router.params.level) {
     currentLevel.value = Number(router.params.level) || 3
   }
@@ -347,6 +351,9 @@ onMounted(() => {
 }
 
 .list-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+
   .loading-state {
     display: flex;
     flex-direction: column;
@@ -460,17 +467,6 @@ onMounted(() => {
       color: $purple-deep;
     }
   }
-
-  .list-footer {
-    padding: 20rpx;
-    text-align: center;
-
-    .footer-text {
-      font-size: 20rpx;
-      color: $gray-light;
-    }
-  }
-}
 
 .my-rank-area {
   padding: 16rpx 32rpx;

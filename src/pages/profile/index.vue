@@ -3,15 +3,15 @@
     <view class="user-header">
       <view class="user-info">
         <view class="avatar-wrap">
-          <view v-if="userStore.isLogin && userStore.userInfo.avatarUrl && isUrl(userStore.userInfo.avatarUrl)" class="avatar avatar-url">
-            <image class="avatar-img" :src="userStore.userInfo.avatarUrl" mode="aspectFill" />
+          <view v-if="userStore.isLogin && userStore.userInfo.avatarUrl && !avatarLoadError" class="avatar avatar-url">
+            <image class="avatar-img" :src="userStore.userInfo.avatarUrl" mode="aspectFill" @error="handleAvatarError" />
           </view>
           <view v-else class="avatar avatar-emoji-wrap">
-            <text class="avatar-emoji-text">{{ userStore.isLogin && userStore.userInfo.avatarUrl ? userStore.userInfo.avatarUrl : '👤' }}</text>
+            <text class="avatar-emoji-text">👤</text>
           </view>
         </view>
         <view class="user-detail">
-          <text class="nickname">{{ userStore.userInfo.nickName || '游客' }}</text>
+          <text class="nickname">{{ typeof userStore.userInfo.nickName === 'string' && userStore.userInfo.nickName ? userStore.userInfo.nickName : '游客' }}</text>
           <text class="user-status">{{ userStore.isLogin ? '已登录' : '游客模式' }}</text>
         </view>
       </view>
@@ -108,13 +108,13 @@
           @tap="handleBestCardTap(lv)"
         >
           <text class="best-level" :style="{ color: levelConfig[lv].textColor }">{{ lv }}×{{ lv }}</text>
-          <template v-if="userStore.hasBestRecord(lv)">
+          <view v-if="userStore.hasBestRecord(lv)">
             <text class="best-time">{{ formatTime(userStore.getBestTime(lv) || 0) }}秒</text>
             <view class="best-bottom">
               <text class="best-error">{{ userStore.getBestError(lv) }}次错误</text>
               <text class="best-rating" :class="getRatingClass(userStore.getBestTime(lv) || 0, lv)">{{ getRating(userStore.getBestTime(lv) || 0, lv) }}</text>
             </view>
-          </template>
+          </view>
           <view v-else>
             <text class="best-time">-</text>
             <text class="best-no-record">暂无记录</text>
@@ -159,10 +159,11 @@
         <view class="login-form">
           <view class="avatar-section">
             <text class="form-label">选择头像</text>
-            <view class="avatar-btn" @tap="switchAvatar">
-              <text class="avatar-emoji">{{ avatarEmojis[currentAvatarIndex] }}</text>
-            </view>
-            <text class="avatar-hint">点击切换头像</text>
+            <button class="avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
+              <image v-if="loginAvatarUrl" class="avatar-preview" :src="loginAvatarUrl" mode="aspectFill" />
+              <text v-else class="avatar-placeholder">👤</text>
+            </button>
+            <text class="avatar-hint">点击选择微信头像</text>
           </view>
           <view class="nickname-section">
             <text class="form-label">输入昵称</text>
@@ -173,7 +174,11 @@
           <view class="btn btn-gray" @tap="cancelLogin">
             <text>取消</text>
           </view>
-          <view class="btn btn-purple" @tap="() => confirmLogin(avatarEmojis[currentAvatarIndex])">
+          <view 
+            class="btn" 
+            :class="loginNickName.trim() ? 'btn-purple' : 'btn-disabled'" 
+            @tap="confirmLogin"
+          >
             <text>确认登录</text>
           </view>
         </view>
@@ -193,8 +198,15 @@ const userStore = useUserStore()
 const levels = [3, 4, 5, 6, 7, 8]
 const levelConfig = LEVEL_CONFIG
 const showLogoutModal = ref(false)
-const avatarEmojis = ['👤', '👩', '👨', '👧', '👦', '👩‍🦰', '👨‍🦰', '👩‍🦳', '👨‍🦳', '🧑']
-const currentAvatarIndex = ref(0)
+const avatarLoadError = ref(false)
+
+function handleAvatarError() {
+  avatarLoadError.value = true
+  if (userStore.userInfo && userStore.userInfo.avatarUrl) {
+    userStore.userInfo.avatarUrl = ''
+    userStore.saveToStorage()
+  }
+}
 
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 const today = getToday()
@@ -204,24 +216,19 @@ const currentMonth = ref(parseInt(todayParts[1]))
 
 const {
   showLoginDialog,
+  loginAvatarUrl,
   loginNickName,
   openLoginDialog,
+  onChooseAvatar,
   onNicknameInput,
   confirmLogin,
   cancelLogin
 } = useLogin()
 
-function switchAvatar() {
-  currentAvatarIndex.value = (currentAvatarIndex.value + 1) % avatarEmojis.length
-}
-
 function isUrl(str) {
-  try {
-    new URL(str)
-    return true
-  } catch {
-    return false
-  }
+  if (typeof str !== 'string') return false
+  // 检查是否是 http/https URL 或者微信文件 URL
+  return str.startsWith('http://') || str.startsWith('https://') || str.startsWith('wxfile://')
 }
 
 const currentMonthText = computed(() => {
@@ -413,6 +420,7 @@ function getRatingClass(time, level) {
 
         &.avatar-url {
           overflow: hidden;
+          background-color: transparent;
 
           .avatar-img {
             width: 100%;
@@ -438,13 +446,13 @@ function getRatingClass(time, level) {
       flex-direction: column;
 
       .nickname {
-        font-size: 18rpx;
+        font-size: 32rpx;
         font-weight: bold;
         color: $purple-deep;
       }
 
       .user-status {
-        font-size: 12rpx;
+        font-size: 22rpx;
         color: $purple-light;
         margin-top: $spacing-xs;
       }
@@ -518,12 +526,12 @@ function getRatingClass(time, level) {
     }
 
     .stat-value {
-      font-size: 24rpx;
+      font-size: 36rpx;
       font-weight: bold;
     }
 
     .stat-label {
-      font-size: 14rpx;
+      font-size: 22rpx;
       color: $gray-text;
       margin-top: $spacing-xs;
     }
@@ -545,7 +553,7 @@ function getRatingClass(time, level) {
   }
 
   .section-title {
-    font-size: 24rpx;
+    font-size: 30rpx;
     font-weight: bold;
     color: $purple-deep;
     display: block;
@@ -579,7 +587,7 @@ function getRatingClass(time, level) {
     }
 
     .calendar-month {
-      font-size: 24rpx;
+      font-size: 28rpx;
       color: $text-dark;
       font-weight: bold;
       min-width: 160rpx;
@@ -595,7 +603,7 @@ function getRatingClass(time, level) {
     .weekday {
       flex: 1;
       text-align: center;
-      font-size: 20rpx;
+      font-size: 26rpx;
       color: $gray-text;
       font-weight: bold;
     }
@@ -609,7 +617,7 @@ function getRatingClass(time, level) {
 
       .calendar-day {
         flex: 1;
-        height: 72rpx;
+        height: 80rpx;
         border-radius: $radius-btn;
         display: flex;
         align-items: center;
@@ -620,7 +628,7 @@ function getRatingClass(time, level) {
         position: relative;
 
         .day-text {
-          font-size: 22rpx;
+          font-size: 28rpx;
           color: $text-dark;
         }
 
@@ -628,7 +636,7 @@ function getRatingClass(time, level) {
           position: absolute;
           bottom: 4rpx;
           right: 8rpx;
-          font-size: 14rpx;
+          font-size: 18rpx;
           color: white;
           font-weight: bold;
         }

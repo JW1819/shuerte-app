@@ -21,8 +21,8 @@ page {
 
 .btn {
   border-radius: $radius-btn;
-  padding: 12rpx 32rpx;
-  font-size: 16rpx;
+  padding: 16rpx 40rpx;
+  font-size: 28rpx;
   text-align: center;
   border: none;
   display: inline-flex;
@@ -56,8 +56,14 @@ page {
 }
 
 .btn-purple {
-  background-color: $purple-bg;
+  background-color: $purple-deep;
   color: white;
+}
+
+.btn-disabled {
+  background-color: #E0E0E0;
+  color: #999999;
+  pointer-events: none;
 }
 
 .card {
