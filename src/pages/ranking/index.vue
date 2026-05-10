@@ -50,7 +50,7 @@
             </text>
             <text v-else class="guest-rank-text">登录后可参与全网排行</text>
           </view>
-          <view class="btn btn-purple btn-login" @tap="openLoginDialog">
+          <view class="btn btn-purple btn-login" @tap="onLoginTap">
             <text>去登录</text>
           </view>
         </view>
@@ -66,7 +66,6 @@
     <scroll-view 
       class="list-body" 
       scroll-y
-      :style="{ height: listBodyHeight }"
       refresher-enabled
       :refresher-triggered="isRefreshing"
       refresher-default-style="none"
@@ -105,36 +104,12 @@
       </view>
     </scroll-view>
 
-    <view v-if="showLoginDialog" class="modal-mask" @tap="cancelLogin">
-      <view class="modal-content" @tap.stop>
-        <text class="modal-title">登录授权</text>
-        <view class="login-form">
-          <view class="avatar-section">
-            <text class="form-label">选择头像</text>
-            <view class="avatar-btn" @tap="switchAvatar">
-              <text class="avatar-emoji">{{ avatarEmojis[currentAvatarIndex] }}</text>
-            </view>
-            <text class="avatar-hint">点击切换头像</text>
-          </view>
-          <view class="nickname-section">
-            <text class="form-label">输入昵称</text>
-            <input class="nickname-input" type="nickname" :value="loginNickName" @blur="onNicknameInput" placeholder="请输入昵称" />
-          </view>
-        </view>
-        <view class="modal-actions">
-          <view class="btn btn-gray" @tap="cancelLogin">
-            <text>取消</text>
-          </view>
-          <view class="btn btn-purple" @tap="handleLoginConfirm">
-            <text>确认登录</text>
-          </view>
-        </view>
-      </view>
-    </view>
+    <LoginDialog />
   </view>
 </template>
 
 <script setup>
+import LoginDialog from '@/components/LoginDialog.vue'
 import { ref, onMounted } from 'vue'
 import Taro, { useRouter } from '@tarojs/taro'
 import { useUserStore } from '@/store/user'
@@ -149,32 +124,13 @@ const levelConfig = LEVEL_CONFIG
 const currentLevel = ref(3)
 const rankingList = ref([])
 const myRank = ref(0)
-const avatarEmojis = ['👤', '👩', '👨', '👧', '👦', '👩‍🦰', '👨‍🦰', '👩‍🦳', '👨‍🦳', '🧑']
-const currentAvatarIndex = ref(0)
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 
-const listBodyHeight = ref('500rpx')
+const { openLoginDialog } = useLogin()
 
-const {
-  showLoginDialog,
-  loginAvatarUrl,
-  loginNickName,
-  openLoginDialog,
-  onNicknameInput,
-  confirmLogin,
-  cancelLogin
-} = useLogin()
-
-function switchAvatar() {
-  currentAvatarIndex.value = (currentAvatarIndex.value + 1) % avatarEmojis.length
-  loginAvatarUrl.value = avatarEmojis[currentAvatarIndex.value]
-}
-
-function handleLoginConfirm() {
-  if (confirmLogin()) {
-    loadRanking()
-  }
+function onLoginTap() {
+  openLoginDialog(() => loadRanking())
 }
 
 function switchLevel(lv) {
@@ -242,10 +198,6 @@ function onRefresh() {
 }
 
 onMounted(() => {
-  const systemInfo = Taro.getSystemInfoSync()
-  const screenHeight = systemInfo.windowHeight || 667
-  listBodyHeight.value = `${screenHeight * 2 - 420}rpx`
-  
   if (router.params.level) {
     currentLevel.value = Number(router.params.level) || 3
   }
@@ -267,13 +219,16 @@ onMounted(() => {
 }
 
 .ranking-page {
-  min-height: 100vh;
+  height: 100vh;
+  box-sizing: border-box;
   background-color: $bg-color;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .nav-bar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -299,6 +254,7 @@ onMounted(() => {
 }
 
 .level-tabs {
+  flex-shrink: 0;
   padding: 16rpx 32rpx;
 
   .tabs-scroll {
@@ -334,6 +290,7 @@ onMounted(() => {
 }
 
 .list-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   padding: 20rpx 32rpx;
@@ -351,6 +308,9 @@ onMounted(() => {
 }
 
 .list-body {
+  flex: 1;
+  height: 0;
+  min-height: 160rpx;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 
@@ -469,6 +429,7 @@ onMounted(() => {
   }
 
 .my-rank-area {
+  flex-shrink: 0;
   padding: 16rpx 32rpx;
   background-color: #FFFFFF;
   margin: 0 24rpx;
@@ -552,110 +513,4 @@ onMounted(() => {
   }
 }
 
-.modal-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-
-  .modal-content {
-    background-color: #FFFFFF;
-    border-radius: $radius-popup;
-    padding: 40rpx;
-    width: 560rpx;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-
-    .modal-title {
-      font-size: 18rpx;
-      font-weight: bold;
-      color: $text-dark;
-      margin-bottom: 20rpx;
-    }
-
-    .login-form {
-      width: 100%;
-
-      .avatar-section {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin-bottom: 32rpx;
-
-        .form-label {
-          font-size: 14rpx;
-          color: $gray-text;
-          margin-bottom: 16rpx;
-        }
-
-        .avatar-btn {
-          width: 100rpx;
-          height: 100rpx;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #E8E0F0, #F0E8F8);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: 4rpx solid rgba(255, 255, 255, 0.8);
-          box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
-          transition: all 0.2s;
-
-          &:active {
-            transform: scale(0.95);
-          }
-
-          .avatar-emoji {
-            font-size: 48rpx;
-          }
-        }
-
-        .avatar-hint {
-          font-size: 12rpx;
-          color: $gray-light;
-          margin-top: 8rpx;
-        }
-      }
-
-      .nickname-section {
-        display: flex;
-        flex-direction: column;
-
-        .form-label {
-          font-size: 14rpx;
-          color: $gray-text;
-          margin-bottom: 12rpx;
-        }
-
-        .nickname-input {
-          width: 100%;
-          height: 80rpx;
-          border-radius: $radius-btn;
-          background-color: #F8F8F8;
-          padding: 0 24rpx;
-          font-size: 16rpx;
-          border: 2rpx solid #F0E8E0;
-          box-sizing: border-box;
-
-          &:focus {
-            border-color: $purple-light;
-            background-color: #FFFFFF;
-          }
-        }
-      }
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 24rpx;
-      margin-top: 20rpx;
-    }
-  }
-}
 </style>

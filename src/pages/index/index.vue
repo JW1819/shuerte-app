@@ -10,11 +10,19 @@
       <text class="welcome-subtitle">专注力训练 · 全年龄段适用</text>
     </view>
 
-    <view class="sign-area" @tap="handleSignIn">
+    <view class="sign-area">
       <view class="sign-box">
-        <text class="sign-text">
-          连续签到 <text class="sign-days">{{ userStore.continuousSign }}</text> 天 | {{ userStore.todaySigned ? '今日已打卡' : '今日未打卡' }}
-        </text>
+        <view class="sign-item" @tap="handleSignIn">
+          <text class="sign-text">{{ userStore.todaySigned ? '今日已打卡' : '打卡' }}</text>
+        </view>
+        <view class="sign-divider"></view>
+        <view class="sign-item">
+          <text class="sign-text">连续{{ userStore.continuousSign }}天</text>
+        </view>
+        <view class="sign-divider"></view>
+        <view class="sign-item" @tap="showCalendar = true">
+          <text class="sign-text">打卡日历</text>
+        </view>
       </view>
     </view>
 
@@ -54,38 +62,15 @@
       </view>
     </view>
 
-    <view v-if="showLoginDialog" class="modal-mask" @tap="cancelLogin">
-      <view class="modal-content" @tap.stop>
-        <text class="modal-title">登录授权</text>
-        <view class="login-form">
-          <view class="avatar-section">
-            <text class="form-label">选择头像</text>
-            <button class="avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
-              <image v-if="loginAvatarUrl" class="avatar-preview" :src="loginAvatarUrl" mode="aspectFill" />
-              <view v-else class="avatar-placeholder">
-                <text>👤</text>
-              </view>
-            </button>
-          </view>
-          <view class="nickname-section">
-            <text class="form-label">输入昵称</text>
-            <input class="nickname-input" type="nickname" :value="loginNickName" @blur="onNicknameInput" placeholder="请输入昵称" />
-          </view>
-        </view>
-        <view class="modal-actions">
-          <view class="btn btn-gray" @tap="cancelLogin">
-            <text>取消</text>
-          </view>
-          <view class="btn btn-purple" @tap="confirmLogin">
-            <text>确认登录</text>
-          </view>
-        </view>
-      </view>
-    </view>
+    <LoginDialog />
+    <CalendarModal :visible="showCalendar" @close="showCalendar = false" />
   </view>
 </template>
 
 <script setup>
+import { ref } from 'vue'
+import LoginDialog from '@/components/LoginDialog.vue'
+import CalendarModal from '@/components/CalendarModal.vue'
 import { useUserStore } from '@/store/user'
 import { LEVEL_CONFIG, formatTime } from '@/utils/index'
 import { useLogin } from '@/utils/useLogin'
@@ -94,17 +79,9 @@ import Taro from '@tarojs/taro'
 const userStore = useUserStore()
 const levels = [3, 4, 5, 6, 7, 8]
 const levelConfig = LEVEL_CONFIG
+const showCalendar = ref(false)
 
-const {
-  showLoginDialog,
-  loginAvatarUrl,
-  loginNickName,
-  openLoginDialog,
-  onChooseAvatar,
-  onNicknameInput,
-  confirmLogin,
-  cancelLogin
-} = useLogin()
+const { openLoginDialog } = useLogin()
 
 function handleSignIn() {
   if (userStore.todaySigned) {
@@ -180,16 +157,26 @@ function goProfile() {
   .sign-box {
     background-color: $orange-bg;
     border-radius: $radius-btn;
-    padding: $spacing-md $spacing-xl;
+    padding: $spacing-md $spacing-lg;
+    display: flex;
+    align-items: center;
 
-    .sign-text {
-      font-size: 28rpx;
-      color: $orange-light;
+    .sign-item {
+      padding: 0 $spacing-md;
+      display: flex;
+      align-items: center;
+      justify-content: center;
 
-      .sign-days {
-        font-weight: bold;
-        font-size: 36rpx;
+      .sign-text {
+        font-size: 28rpx;
+        color: $orange-light;
       }
+    }
+
+    .sign-divider {
+      width: 2rpx;
+      height: 32rpx;
+      background-color: rgba($orange-light, 0.3);
     }
   }
 }
@@ -303,39 +290,4 @@ function goProfile() {
   }
 }
 
-.modal-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-
-  .modal-content {
-    background-color: #FFFFFF;
-    border-radius: $radius-popup;
-    padding: 40rpx;
-    width: 560rpx;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-
-    .modal-title {
-      font-size: 18rpx;
-      font-weight: bold;
-      color: $text-dark;
-      margin-bottom: 20rpx;
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 24rpx;
-      margin-top: 20rpx;
-    }
-  }
-}
 </style>

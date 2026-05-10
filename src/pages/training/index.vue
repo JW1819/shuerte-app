@@ -188,7 +188,7 @@ function startCountdown() {
 function startTimer() {
   timerInterval.value = setInterval(() => {
     elapsedMs.value = Date.now() - startTime.value
-  }, 16)
+  }, 50)
 }
 
 function stopTimer() {

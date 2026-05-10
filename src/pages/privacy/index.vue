@@ -46,25 +46,30 @@ function goBack() {
 <style lang="scss">
 @import '@/styles/variables.scss';
 .content-page {
-  min-height: 100vh;
+  height: 100vh;
   background-color: $bg-color;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 .nav-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 20rpx $spacing-lg;
-  height: 44rpx;
+  height: 88rpx;
+  box-sizing: border-box;
+  flex-shrink: 0;
   .nav-left { .back-icon { font-size: 40rpx; color: $gray-light; } }
   .nav-title { font-size: 32rpx; font-weight: bold; color: $purple-deep; }
   .nav-right { width: 40rpx; }
 }
 .content-body {
   padding: $spacing-lg;
-  height: calc(100vh - 84rpx);
+  flex: 1;
+  overflow-y: auto;
   box-sizing: border-box;
-  overflow-x: hidden;
+  padding-bottom: calc(env(safe-area-inset-bottom) + #{$spacing-xl});
 }
 .content-section {
   margin-bottom: $spacing-xl;
