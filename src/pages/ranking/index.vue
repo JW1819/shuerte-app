@@ -152,40 +152,43 @@ function getMedalIcon(rank) {
   return ''
 }
 
-function loadRanking() {
+async function loadRanking() {
   isLoading.value = true
-  // TODO: 接入微信云开发数据库后替换为真实数据
-  // wx.cloud.database().collection('score')
-  //   .where({ level: currentLevel.value })
-  //   .orderBy('bestTime', 'asc')
-  //   .limit(100)
-  //   .get()
-  setTimeout(() => {
-    const mockData = []
-    const baseTimes = { 3: 3000, 4: 6000, 5: 12000, 6: 20000, 7: 35000, 8: 50000 }
-    const base = baseTimes[currentLevel.value] || 10000
-    const avatars = ['👤', '👩', '👨', '👧', '👦', '👩‍🦰', '👨‍🦰', '👩‍🦳', '👨‍🦳', '🧑', '👨‍💼', '👩‍💼', '👨‍🔧', '👩‍🔧', '👨‍🏫', '👩‍🏫', '👨‍⚕️', '👩‍⚕️', '👨‍🎨', '👩‍🎨']
-    for (let i = 0; i < 20; i++) {
-      mockData.push({
-        nickName: `用户${i + 1}`,
-        bestTime: base + i * 800 + Math.floor(Math.random() * 500),
-        errorCount: Math.floor(Math.random() * 3),
-        avatar: avatars[i % avatars.length]
-      })
-    }
-    mockData.sort((a, b) => a.bestTime - b.bestTime)
-    rankingList.value = mockData
 
-    if (userStore.isLogin && userStore.getBestTime(currentLevel.value)) {
-      const myTime = userStore.getBestTime(currentLevel.value)
-      const rank = mockData.filter(d => d.bestTime < myTime).length + 1
-      myRank.value = rank <= 100 ? rank : 0
+  try {
+    if (Taro.cloud) {
+      const res = await Taro.cloud.callFunction({
+        name: 'getRanking',
+        data: {
+          level: currentLevel.value,
+          myOpenId: userStore.userInfo.openId || ''
+        }
+      })
+
+      if (res.result && res.result.success) {
+        rankingList.value = res.result.data.map(item => ({
+          nickName: item.nickName || '用户',
+          bestTime: item.bestTime,
+          errorCount: item.bestError || 0,
+          avatar: item.avatarUrl || '👤'
+        }))
+        myRank.value = res.result.myRank || 0
+      } else {
+        rankingList.value = []
+        myRank.value = 0
+      }
     } else {
+      rankingList.value = []
       myRank.value = 0
     }
+  } catch (e) {
+    console.error('loadRanking error', e)
+    rankingList.value = []
+    myRank.value = 0
+  } finally {
     isLoading.value = false
     isRefreshing.value = false
-  }, 300)
+  }
 }
 
 function goBack() {

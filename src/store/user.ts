@@ -157,31 +157,46 @@ export const useUserStore = defineStore('user', () => {
     return !!scores.value[level]
   }
 
-  function login(nickName: string, avatarUrl: string) {
+  async function login(nickName: string, avatarUrl: string) {
     isLogin.value = true
     userInfo.value = { nickName, avatarUrl, openId: '' }
-    Taro.login({
-      success: (res) => {
-        // TODO: 将 res.code 发送至云函数换取 openId
-        // wx.cloud.callFunction({ name: 'login', data: { code: res.code } })
-      }
-    })
     saveToStorage()
+
+    try {
+      if (Taro.cloud) {
+        const loginRes = await Taro.cloud.callFunction({ name: 'login' })
+        if (loginRes.result && loginRes.result.openId) {
+          userInfo.value.openId = loginRes.result.openId
+          saveToStorage()
+        }
+      }
+    } catch (e) {
+      console.error('login cloud function error', e)
+    }
+
     syncToCloud()
   }
 
-  function syncToCloud() {
-    // TODO: 接入微信云开发后实现数据同步
-    // wx.cloud.callFunction({
-    //   name: 'syncData',
-    //   data: {
-    //     scores: scores.value,
-    //     continuousSign: continuousSign.value,
-    //     totalGameCount: totalGameCount.value,
-    //     totalTime: totalTime.value,
-    //     signLog: signLog.value
-    //   }
-    // })
+  async function syncToCloud() {
+    if (!isLogin.value || !Taro.cloud) return
+
+    try {
+      await Taro.cloud.callFunction({
+        name: 'syncData',
+        data: {
+          openId: userInfo.value.openId,
+          nickName: userInfo.value.nickName,
+          avatarUrl: userInfo.value.avatarUrl,
+          scores: scores.value,
+          continuousSign: continuousSign.value,
+          totalGameCount: totalGameCount.value,
+          totalTime: totalTime.value,
+          signLog: signLog.value
+        }
+      })
+    } catch (e) {
+      console.error('syncToCloud error', e)
+    }
   }
 
   function logout() {

@@ -29,10 +29,14 @@
     <view class="level-area">
       <view class="level-grid">
         <view
-          v-for="level in levels"
+          v-for="(level, idx) in levels"
           :key="level"
           class="level-card card"
-          :style="{ backgroundColor: levelConfig[level].bgColor, borderColor: levelConfig[level].borderColor }"
+          :style="{ 
+            backgroundColor: levelConfig[level].bgColor, 
+            borderColor: levelConfig[level].borderColor,
+            '--delay': (idx * 0.3) + 's'
+          }"
           @tap="goTraining(level)"
         >
           <text class="level-id" :style="{ color: levelConfig[level].textColor }">{{ level }}×{{ level }}</text>
@@ -107,6 +111,18 @@ function goProfile() {
 
 <style lang="scss">
 @import '@/styles/variables.scss';
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-6rpx) rotate(0.8deg);
+  }
+  75% {
+    transform: translateY(6rpx) rotate(-0.8deg);
+  }
+}
 
 .home-page {
   min-height: 100vh;
@@ -205,6 +221,8 @@ function goProfile() {
     border-radius: $radius-card;
     transition: all 0.2s ease;
     box-sizing: border-box;
+    animation: float 4s ease-in-out infinite;
+    animation-delay: calc(var(--delay, 0s));
 
     &:active {
       transform: scale(0.96);

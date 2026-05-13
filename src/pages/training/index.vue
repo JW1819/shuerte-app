@@ -298,7 +298,7 @@ onUnmounted(() => {
 
   .top-center {
     .level-label {
-      font-size: 18rpx;
+      font-size: 24rpx;
       font-weight: bold;
       color: $purple-deep;
     }
@@ -306,7 +306,7 @@ onUnmounted(() => {
 
   .top-right {
     .error-count {
-      font-size: 16rpx;
+      font-size: 22rpx;
       color: $red-light;
     }
   }
@@ -325,7 +325,7 @@ onUnmounted(() => {
   }
 
   .timer-text {
-    font-size: 48rpx;
+    font-size: 56rpx;
     font-weight: bold;
     color: $purple-deep;
     font-variant-numeric: tabular-nums;
@@ -343,7 +343,7 @@ onUnmounted(() => {
     align-items: center;
 
     .progress-text {
-      font-size: 16rpx;
+      font-size: 22rpx;
       color: $gray-text;
       margin-bottom: $spacing-xs;
     }
@@ -392,7 +392,7 @@ onUnmounted(() => {
 
     .cell-number {
       font-weight: bold;
-      font-size: 28rpx;
+      font-size: 56rpx;
     }
   }
 
@@ -451,14 +451,14 @@ onUnmounted(() => {
     align-items: center;
 
     .modal-title {
-      font-size: 18rpx;
+      font-size: 28rpx;
       font-weight: bold;
       color: $text-dark;
-      margin-bottom: 12rpx;
+      margin-bottom: 16rpx;
     }
 
     .modal-desc {
-      font-size: 14rpx;
+      font-size: 24rpx;
       color: $gray-text;
       margin-bottom: 32rpx;
     }
