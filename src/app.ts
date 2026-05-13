@@ -7,7 +7,7 @@ const App = createApp({
   onLaunch() {
     if (Taro.cloud) {
       Taro.cloud.init({
-        env: 'shuerte-cloud',
+        env: 'cloud1-d7g92q5ti56030287',
         traceUser: true
       })
     }

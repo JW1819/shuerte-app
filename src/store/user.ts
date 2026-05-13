@@ -205,6 +205,10 @@ export const useUserStore = defineStore('user', () => {
     saveToStorage()
   }
 
+  function refreshUserInfo() {
+    loadFromStorage()
+  }
+
   loadFromStorage()
 
   return {
@@ -225,6 +229,7 @@ export const useUserStore = defineStore('user', () => {
     hasBestRecord,
     login,
     logout,
+    refreshUserInfo,
     loadFromStorage,
     saveToStorage,
     syncToCloud

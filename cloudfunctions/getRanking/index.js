@@ -65,6 +65,31 @@ exports.main = async (event) => {
       }
     }
 
+    const openIds = rankingData.map(item => item.openId).filter(Boolean)
+    if (openIds.length > 0) {
+      const usersRes = await db.collection('users')
+        .where({ openId: _.in(openIds) })
+        .field({ openId: true, avatarUrl: true, nickName: true })
+        .get()
+
+      const userMap = {}
+      usersRes.data.forEach(user => {
+        userMap[user.openId] = user
+      })
+
+      rankingData = rankingData.map(item => {
+        const userInfo = userMap[item.openId]
+        if (userInfo) {
+          return {
+            ...item,
+            avatarUrl: userInfo.avatarUrl || item.avatarUrl,
+            nickName: userInfo.nickName || item.nickName
+          }
+        }
+        return item
+      })
+    }
+
     return {
       success: true,
       data: rankingData,

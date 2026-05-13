@@ -3,7 +3,7 @@
     <view class="user-header">
       <view class="user-info">
         <view class="avatar-wrap">
-          <view v-if="userStore.isLogin && userStore.userInfo.avatarUrl && !avatarLoadError" class="avatar avatar-url">
+          <view v-if="userStore.isLogin && userStore.userInfo.avatarUrl && !avatarLoadError && (userStore.userInfo.avatarUrl.indexOf('http') === 0 || userStore.userInfo.avatarUrl.indexOf('cloud://') === 0)" class="avatar avatar-url">
             <image class="avatar-img" :src="userStore.userInfo.avatarUrl" mode="aspectFill" @error="handleAvatarError" />
           </view>
           <view v-else class="avatar avatar-emoji-wrap">

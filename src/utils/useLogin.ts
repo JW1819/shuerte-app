@@ -6,6 +6,7 @@ type LoginSuccessHandler = () => void
 
 const showLoginDialog = ref(false)
 const loginAvatarUrl = ref('')
+const loginAvatarFileId = ref('')
 const loginNickName = ref('')
 let pendingSuccessHandler: LoginSuccessHandler | null = null
 
@@ -13,14 +14,14 @@ export function useLogin() {
   const userStore = useUserStore()
 
   function openLoginDialog(onLoggedIn?: LoginSuccessHandler) {
-    pendingSuccessHandler = onLoggedIn ?? null
+    pendingSuccessHandler = onLoggedIn !== null && onLoggedIn !== undefined ? onLoggedIn : null
     loginAvatarUrl.value = (userStore.userInfo && userStore.userInfo.avatarUrl) || ''
     loginNickName.value =
       userStore.userInfo && userStore.userInfo.nickName !== '游客' ? userStore.userInfo.nickName : ''
     showLoginDialog.value = true
   }
 
-  function onChooseAvatar(e: { detail?: { avatarUrl?: string; tempFilePath?: string } }) {
+  async function onChooseAvatar(e: { detail?: { avatarUrl?: string; tempFilePath?: string } }) {
     const detail = e.detail || {}
     const avatarUrl = detail.avatarUrl || detail.tempFilePath || ''
     if (!avatarUrl) {
@@ -31,22 +32,58 @@ export function useLogin() {
       Taro.showToast({ title: '头像路径无效', icon: 'none' })
       return
     }
-    async function saveAvatar(tempPath: string) {
-      try {
-        const fileInfo = await Taro.getFileInfo({ filePath: tempPath })
-        if (!fileInfo.size) throw new Error('文件无效')
-        const res = await Taro.saveFile({ tempFilePath: tempPath })
-        loginAvatarUrl.value = res.savedFilePath
-      } catch {
-        loginAvatarUrl.value = tempPath
-        Taro.showToast({ title: '头像保存失败，已使用临时路径', icon: 'none' })
+
+    try {
+      Taro.showLoading({ title: '上传头像中...' })
+      
+      if (!Taro.cloud) {
+        const res = await Taro.saveFile({ tempFilePath: avatarUrl })
+          .catch(() => ({ savedFilePath: avatarUrl }))
+        loginAvatarUrl.value = res.savedFilePath || avatarUrl
+        Taro.hideLoading()
+        return
       }
+
+      const fileInfo = await Taro.getFileInfo({ filePath: avatarUrl })
+      if (!fileInfo.size) throw new Error('文件无效')
+
+      const cloudPath = `avatars/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.png`
+      const uploadRes = await Taro.cloud.uploadFile({
+        cloudPath,
+        filePath: avatarUrl
+      })
+
+      if (uploadRes.fileID) {
+        loginAvatarFileId.value = uploadRes.fileID
+        try {
+          const downloadRes = await Taro.cloud.getTempFileURL({
+            fileList: [uploadRes.fileID]
+          })
+          if (downloadRes.fileList && downloadRes.fileList[0] && downloadRes.fileList[0].tempFileURL) {
+            loginAvatarUrl.value = downloadRes.fileList[0].tempFileURL
+          } else {
+            loginAvatarUrl.value = uploadRes.fileID
+          }
+        } catch (e) {
+          console.log('getTempFileURL failed, using fileID')
+          loginAvatarUrl.value = uploadRes.fileID
+        }
+      } else {
+        throw new Error('上传失败')
+      }
+
+      Taro.hideLoading()
+    } catch (err) {
+      console.error('avatar upload error', err)
+      Taro.hideLoading()
+      const res = await Taro.saveFile({ tempFilePath: avatarUrl }).catch(() => ({ savedFilePath: avatarUrl }))
+      loginAvatarUrl.value = res.savedFilePath || avatarUrl
+      Taro.showToast({ title: '头像上传失败，已使用本地路径', icon: 'none' })
     }
-    saveAvatar(avatarUrl)
   }
 
   function onNicknameInput(e: { detail?: { value?: string } }) {
-    loginNickName.value = e.detail?.value ?? ''
+    loginNickName.value = e.detail && e.detail.value !== undefined ? e.detail.value : ''
   }
 
   function confirmLogin(): boolean {
@@ -54,11 +91,14 @@ export function useLogin() {
       Taro.showToast({ title: '请输入昵称', icon: 'none' })
       return false
     }
-    userStore.login(loginNickName.value.trim(), loginAvatarUrl.value)
+    const avatarToSave = loginAvatarFileId.value || loginAvatarUrl.value
+    userStore.login(loginNickName.value.trim(), avatarToSave)
     showLoginDialog.value = false
     const cb = pendingSuccessHandler
     pendingSuccessHandler = null
-    cb?.()
+    if (cb) {
+      cb()
+    }
     Taro.showToast({ title: '登录成功', icon: 'none' })
     return true
   }
