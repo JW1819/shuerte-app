@@ -103,7 +103,6 @@ const elapsedMs = ref(0)
 const timerInterval = ref(null)
 const cdIntervalRef = ref(null)
 const showExitModal = ref(false)
-const isReady = ref(false)
 
 const countdownColor = computed(() => {
   return MACARON_COLORS[countdown.value % MACARON_COLORS.length]
@@ -139,7 +138,10 @@ const progressPercent = computed(() => {
 
 function cellStyle(cell) {
   const size = level.value
-  const cellSize = size <= 5 ? '100rpx' : '72rpx'
+  let fontSize = '56rpx'
+  if (size >= 8) fontSize = '28rpx'
+  else if (size >= 7) fontSize = '32rpx'
+  else if (size >= 6) fontSize = '40rpx'
   const baseStyle = {
     width: '100%',
     aspectRatio: '1',
@@ -149,7 +151,8 @@ function cellStyle(cell) {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.2s'
+    transition: 'all 0.2s',
+    fontSize
   }
   return baseStyle
 }
@@ -392,7 +395,7 @@ onUnmounted(() => {
 
     .cell-number {
       font-weight: bold;
-      font-size: 56rpx;
+      font-size: inherit;
     }
   }
 
@@ -481,7 +484,6 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  pointer-events: none;
 
   .countdown-content {
     display: flex;

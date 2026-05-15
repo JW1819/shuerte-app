@@ -202,6 +202,13 @@ export const useUserStore = defineStore('user', () => {
   function logout() {
     isLogin.value = false
     userInfo.value = { nickName: '游客', avatarUrl: '', openId: '' }
+    scores.value = {}
+    signLog.value = []
+    gameLog.value = []
+    continuousSign.value = 0
+    totalGameCount.value = 0
+    totalTime.value = 0
+    lastSignDate.value = ''
     saveToStorage()
   }
 
@@ -209,7 +216,15 @@ export const useUserStore = defineStore('user', () => {
     loadFromStorage()
   }
 
-  loadFromStorage()
+  function initStore() {
+    try {
+      if (typeof Taro !== 'undefined' && Taro.getStorageSync) {
+        loadFromStorage()
+      }
+    } catch (e) {
+      console.warn('Store initialization delayed, will retry on mount')
+    }
+  }
 
   return {
     isLogin,
@@ -232,6 +247,7 @@ export const useUserStore = defineStore('user', () => {
     refreshUserInfo,
     loadFromStorage,
     saveToStorage,
-    syncToCloud
+    syncToCloud,
+    initStore
   }
 })

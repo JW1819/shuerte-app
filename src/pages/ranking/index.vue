@@ -1,11 +1,7 @@
 <template>
   <view class="ranking-page">
     <view class="nav-bar">
-      <view class="nav-left" @tap="goBack">
-        <text class="back-icon">←</text>
-      </view>
       <text class="nav-title">全网排行榜</text>
-      <view class="nav-right"></view>
     </view>
 
     <view class="level-tabs">
@@ -117,7 +113,7 @@
 <script setup>
 import LoginDialog from '@/components/LoginDialog.vue'
 import { ref, onMounted } from 'vue'
-import Taro, { useRouter } from '@tarojs/taro'
+import Taro, { useRouter, useDidShow } from '@tarojs/taro'
 import { useUserStore } from '@/store/user'
 import { LEVEL_CONFIG, formatTime } from '@/utils/index'
 import { useLogin } from '@/utils/useLogin'
@@ -134,11 +130,11 @@ const isLoading = ref(false)
 const isRefreshing = ref(false)
 
 const mockRankingData = [
-  { nickName: '小明', bestTime: 4.5, bestError: 0, avatarUrl: '' },
-  { nickName: '小红', bestTime: 5.2, bestError: 1, avatarUrl: '' },
-  { nickName: '小华', bestTime: 6.1, bestError: 0, avatarUrl: '' },
-  { nickName: '小李', bestTime: 7.3, bestError: 2, avatarUrl: '' },
-  { nickName: '小张', bestTime: 8.0, bestError: 1, avatarUrl: '' },
+  { nickName: '小明', bestTime: 4500, bestError: 0, avatarUrl: '' },
+  { nickName: '小红', bestTime: 5200, bestError: 1, avatarUrl: '' },
+  { nickName: '小华', bestTime: 6100, bestError: 0, avatarUrl: '' },
+  { nickName: '小李', bestTime: 7300, bestError: 2, avatarUrl: '' },
+  { nickName: '小张', bestTime: 8000, bestError: 1, avatarUrl: '' },
 ]
 
 const { openLoginDialog } = useLogin()
@@ -271,10 +267,6 @@ async function loadRanking() {
   }
 }
 
-function goBack() {
-  Taro.navigateBack()
-}
-
 function onRefresh() {
   isRefreshing.value = true
   loadRanking()
@@ -285,6 +277,15 @@ onMounted(() => {
     currentLevel.value = Number(router.params.level) || 3
   }
   loadRanking()
+})
+
+useDidShow(() => {
+  const pendingLevel = Taro.getStorageSync('pendingRankingLevel')
+  if (pendingLevel) {
+    currentLevel.value = Number(pendingLevel)
+    Taro.removeStorageSync('pendingRankingLevel')
+    loadRanking()
+  }
 })
 </script>
 
@@ -314,25 +315,14 @@ onMounted(() => {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 20rpx $spacing-lg;
   height: 44rpx;
-
-  .nav-left {
-    .back-icon {
-      font-size: 40rpx;
-      color: $gray-light;
-    }
-  }
 
   .nav-title {
     font-size: 28rpx;
     font-weight: bold;
     color: $purple-deep;
-  }
-
-  .nav-right {
-    width: 40rpx;
   }
 }
 

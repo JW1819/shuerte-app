@@ -48,17 +48,6 @@
       </view>
     </view>
 
-    <view class="shortcut-area">
-      <view class="shortcut-item" @tap="goRanking">
-        <text class="shortcut-icon">🏆</text>
-        <text class="shortcut-text">排行榜</text>
-      </view>
-      <view class="shortcut-item" @tap="goProfile">
-        <text class="shortcut-icon">📋</text>
-        <text class="shortcut-text">我的记录</text>
-      </view>
-    </view>
-
     <view class="guest-bar" v-if="!userStore.isLogin">
       <text class="guest-text">游客模式可正常训练，登录后同步成绩、参与排行</text>
       <view class="guest-btn btn btn-purple" @tap="openLoginDialog">
@@ -72,7 +61,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import LoginDialog from '@/components/LoginDialog.vue'
 import CalendarModal from '@/components/CalendarModal.vue'
 import { useUserStore } from '@/store/user'
@@ -84,6 +73,10 @@ const userStore = useUserStore()
 const levels = [3, 4, 5, 6, 7, 8]
 const levelConfig = LEVEL_CONFIG
 const showCalendar = ref(false)
+
+onMounted(() => {
+  userStore.initStore()
+})
 
 const { openLoginDialog } = useLogin()
 
@@ -98,14 +91,6 @@ function handleSignIn() {
 
 function goTraining(level) {
   Taro.navigateTo({ url: `/pages/training/index?level=${level}` })
-}
-
-function goRanking() {
-  Taro.navigateTo({ url: '/pages/ranking/index' })
-}
-
-function goProfile() {
-  Taro.navigateTo({ url: '/pages/profile/index' })
 }
 </script>
 
@@ -127,15 +112,18 @@ function goProfile() {
 .home-page {
   min-height: 100vh;
   background-color: $bg-color;
-  padding-bottom: 140rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  box-sizing: border-box;
 }
 
 .nav-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20rpx $spacing-lg;
-  height: 44rpx;
+  padding: 10rpx $spacing-lg;
+  height: 32rpx;
 }
 
 .nav-right {
@@ -149,7 +137,8 @@ function goProfile() {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: $spacing-xl 0 $spacing-lg;
+    padding: 0 0 $spacing-md; 
+    margin-top: -10rpx;
 
     .welcome-title {
       font-size: 56rpx;
@@ -160,7 +149,7 @@ function goProfile() {
     .welcome-subtitle {
       font-size: 28rpx;
       color: $purple-light;
-      margin-top: $spacing-sm;
+      margin-top: $spacing-xs;
     }
   }
 
@@ -199,14 +188,13 @@ function goProfile() {
 
 .level-area {
   padding: $spacing-md $spacing-lg;
-  display: flex;
-  justify-content: center;
 
   .level-grid {
     display: grid;
-    grid-template-columns: 160rpx 160rpx 160rpx;
+    grid-template-columns: repeat(2, 1fr);
     gap: $spacing-md;
-    justify-content: center;
+    max-width: 420rpx;
+    margin: 0 auto;
   }
 
   .level-card {
@@ -214,66 +202,38 @@ function goProfile() {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: $spacing-md;
-    width: 160rpx;
-    height: 180rpx;
+    padding: $spacing-md $spacing-sm;
+    aspect-ratio: 5 / 4;
     border: 2rpx solid transparent;
     border-radius: $radius-card;
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     box-sizing: border-box;
     animation: float 4s ease-in-out infinite;
     animation-delay: calc(var(--delay, 0s));
 
     &:active {
-      transform: scale(0.96);
+      transform: scale(0.95);
+      box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
     }
 
     .level-id {
       font-size: 36rpx;
-      font-weight: bold;
+      font-weight: 700;
+      letter-spacing: -1rpx;
     }
 
     .level-name {
-      font-size: 24rpx;
+      font-size: 22rpx;
       color: $gray-text;
       margin-top: $spacing-xs;
     }
 
     .level-best {
-      font-size: 22rpx;
+      font-size: 20rpx;
       color: $gray-text;
       margin-top: $spacing-xs;
       white-space: nowrap;
       display: inline-block;
-    }
-  }
-}
-
-.shortcut-area {
-  display: flex;
-  justify-content: center;
-  gap: 100rpx;
-  padding: $spacing-xl 0;
-
-  .shortcut-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: $spacing-md;
-    transition: transform 0.2s;
-
-    &:active {
-      transform: scale(0.96);
-    }
-
-    .shortcut-icon {
-      font-size: 40rpx;
-    }
-
-    .shortcut-text {
-      font-size: 14rpx;
-      color: $text-dark;
-      margin-top: $spacing-sm;
     }
   }
 }
@@ -287,13 +247,12 @@ function goProfile() {
   align-items: center;
   justify-content: space-between;
   padding: $spacing-md $spacing-lg;
-  padding-bottom: calc(#{$spacing-md} + constant(safe-area-inset-bottom));
-  padding-bottom: calc(#{$spacing-md} + env(safe-area-inset-bottom));
-  background-color: $bg-color;
+  background-color: #FFFFFF;
   border-top: 1rpx solid #F0E8E0;
+  box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04);
 
   .guest-text {
-    font-size: 12rpx;
+    font-size: 24rpx;
     color: $gray-text;
     flex: 1;
   }
@@ -302,7 +261,7 @@ function goProfile() {
     margin-left: $spacing-md;
 
     .guest-btn-text {
-      font-size: 12rpx;
+      font-size: 24rpx;
       color: white;
     }
   }

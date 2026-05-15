@@ -70,20 +70,7 @@
       </view>
     </view>
 
-    <view class="footer-area">
-      <view class="footer-item" @tap="goPrivacy">
-        <text class="footer-icon">📝</text>
-        <text class="footer-text">隐私政策</text>
-      </view>
-      <view class="footer-item" @tap="goAbout">
-        <text class="footer-icon">ℹ️</text>
-        <text class="footer-text">关于我们</text>
-      </view>
-      <view class="footer-item" @tap="goFeedback">
-        <text class="footer-icon">💬</text>
-        <text class="footer-text">意见反馈</text>
-      </view>
-    </view>
+    
 
     <view v-if="showLogoutModal" class="modal-mask" @tap="showLogoutModal = false">
       <view class="modal-content" @tap.stop>
@@ -148,21 +135,12 @@ function handleLoginAction() {
 
 function confirmLogout() {
   userStore.logout()
+  avatarLoadError.value = false
   showLogoutModal.value = false
   Taro.showToast({ title: '已退出登录', icon: 'none' })
 }
 
-function goPrivacy() {
-  Taro.navigateTo({ url: '/pages/privacy/index' })
-}
 
-function goAbout() {
-  Taro.navigateTo({ url: '/pages/about/index' })
-}
-
-function goFeedback() {
-  Taro.navigateTo({ url: '/pages/feedback/index' })
-}
 
 function getRating(time, level) {
   if (!time || time <= 0) return '-'
@@ -194,6 +172,7 @@ function getRatingClass(time, level) {
 .profile-page {
   min-height: 100vh;
   background-color: $bg-color;
+  box-sizing: border-box;
 }
 
 .user-header {
@@ -466,35 +445,7 @@ function getRatingClass(time, level) {
   }
 }
 
-.footer-area {
-  display: flex;
-  justify-content: space-around;
-  padding: $spacing-xl $spacing-lg;
-  padding-bottom: calc(#{$spacing-xl} + constant(safe-area-inset-bottom));
-  padding-bottom: calc(#{$spacing-xl} + env(safe-area-inset-bottom));
 
-  .footer-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: $spacing-xs;
-    transition: all 0.2s;
-
-    &:active {
-      transform: scale(0.96);
-      opacity: 0.7;
-    }
-
-    .footer-icon {
-      font-size: 32rpx;
-    }
-
-    .footer-text {
-      font-size: 14rpx;
-      color: $gray-text;
-    }
-  }
-}
 
 .modal-mask {
   position: fixed;

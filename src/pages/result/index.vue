@@ -81,7 +81,7 @@ function playAgain() {
 }
 
 function goHome() {
-  Taro.reLaunch({ url: '/pages/index/index' })
+  Taro.switchTab({ url: '/pages/index/index' })
 }
 
 function goRanking() {
@@ -89,7 +89,8 @@ function goRanking() {
     Taro.showToast({ title: '请登录后查看排行', icon: 'none' })
     return
   }
-  Taro.navigateTo({ url: `/pages/ranking/index?level=${level.value}` })
+  Taro.setStorageSync('pendingRankingLevel', level.value)
+  Taro.switchTab({ url: '/pages/ranking/index' })
 }
 
 onMounted(() => {
@@ -114,8 +115,8 @@ onMounted(() => {
   else if (avgTime <= t.b) pct = 60
   else if (avgTime <= t.c) pct = 35
   else pct = 15
-  const jitter = Math.floor(Math.random() * 5) - 2
-  beatPercent.value = Math.max(5, Math.min(99, pct + jitter))
+  const offset = Math.floor(avgTime) % 5 - 2
+  beatPercent.value = Math.max(5, Math.min(99, pct + offset))
 })
 </script>
 

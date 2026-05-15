@@ -14,6 +14,7 @@ const App = createApp({
   }
 })
 
-App.use(createPinia())
+const pinia = createPinia()
+App.use(pinia)
 
 export default App

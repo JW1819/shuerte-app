@@ -166,4 +166,21 @@ const { showLoginDialog, loginAvatarUrl, loginNickName, cancelLogin, confirmLogi
     }
   }
 }
+
+.privacy-tip {
+  margin-top: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .privacy-text {
+    font-size: 22rpx;
+    color: $gray-text;
+  }
+
+  .privacy-link {
+    font-size: 22rpx;
+    color: $purple-light;
+  }
+}
 </style>

@@ -161,12 +161,13 @@ function prevMonth() {
 }
 
 function nextMonth() {
-  if (currentMonth.value === 12) {
-    currentYear.value += 1
-    currentMonth.value = 1
-  } else {
-    currentMonth.value += 1
+  const nextM = currentMonth.value === 12 ? 1 : currentMonth.value + 1
+  const nextY = currentMonth.value === 12 ? currentYear.value + 1 : currentYear.value
+  if (nextY > parseInt(todayParts[0]) || (nextY === parseInt(todayParts[0]) && nextM > parseInt(todayParts[1]))) {
+    return
   }
+  currentYear.value = nextY
+  currentMonth.value = nextM
 }
 
 function handleCalendarTap(day) {

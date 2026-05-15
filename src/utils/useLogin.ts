@@ -93,6 +93,7 @@ export function useLogin() {
     }
     const avatarToSave = loginAvatarFileId.value || loginAvatarUrl.value
     userStore.login(loginNickName.value.trim(), avatarToSave)
+    loginAvatarFileId.value = ''
     showLoginDialog.value = false
     const cb = pendingSuccessHandler
     pendingSuccessHandler = null
