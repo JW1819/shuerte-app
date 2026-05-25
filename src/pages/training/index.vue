@@ -301,7 +301,7 @@ onUnmounted(() => {
 
   .top-center {
     .level-label {
-      font-size: 24rpx;
+      font-size: 28rpx;
       font-weight: bold;
       color: $purple-deep;
     }
@@ -309,7 +309,7 @@ onUnmounted(() => {
 
   .top-right {
     .error-count {
-      font-size: 22rpx;
+      font-size: 26rpx;
       color: $red-light;
     }
   }

@@ -156,7 +156,7 @@ onMounted(() => {
   }
 
   .nav-title {
-    font-size: 18rpx;
+    font-size: 32rpx;
     font-weight: bold;
     color: $purple-deep;
   }

@@ -88,15 +88,6 @@
           <text v-else class="rank-num" :style="{ color: getRankColor(idx + 1) }">{{ idx + 1 }}</text>
         </view>
         <view class="col-user user-info">
-          <image 
-            v-if="item.avatar && (item.avatar.indexOf('http') === 0 || item.avatar.indexOf('cloud://') === 0)" 
-            class="user-avatar-img" 
-            :src="item.avatar" 
-            mode="aspectFill"
-          />
-          <view v-else class="user-avatar-small">
-            <text>{{ '👤' }}</text>
-          </view>
           <text class="user-name">{{ item.nickName }}</text>
         </view>
         <text class="col-time time-text">{{ formatTime(item.bestTime) }}秒</text>
@@ -130,11 +121,11 @@ const isLoading = ref(false)
 const isRefreshing = ref(false)
 
 const mockRankingData = [
-  { nickName: '小明', bestTime: 4500, bestError: 0, avatarUrl: '' },
-  { nickName: '小红', bestTime: 5200, bestError: 1, avatarUrl: '' },
-  { nickName: '小华', bestTime: 6100, bestError: 0, avatarUrl: '' },
-  { nickName: '小李', bestTime: 7300, bestError: 2, avatarUrl: '' },
-  { nickName: '小张', bestTime: 8000, bestError: 1, avatarUrl: '' },
+  { nickName: '小明', bestTime: 4500, bestError: 0 },
+  { nickName: '小红', bestTime: 5200, bestError: 1 },
+  { nickName: '小华', bestTime: 6100, bestError: 0 },
+  { nickName: '小李', bestTime: 7300, bestError: 2 },
+  { nickName: '小张', bestTime: 8000, bestError: 1 },
 ]
 
 const { openLoginDialog } = useLogin()
@@ -179,46 +170,11 @@ async function loadRanking() {
 
       if (res && res.result) {
         if (res.result.success && res.result.data && Array.isArray(res.result.data)) {
-          const rawList = res.result.data.map(item => ({
+          rankingList.value = res.result.data.map(item => ({
             nickName: item.nickName || '用户',
             bestTime: item.bestTime,
-            errorCount: item.bestError || 0,
-            avatar: item.avatarUrl || ''
+            errorCount: item.bestError || 0
           }))
-          
-          const fileIds = rawList
-            .filter(item => item.avatar && item.avatar.startsWith('cloud://'))
-            .map(item => item.avatar)
-          
-          if (fileIds.length > 0) {
-            try {
-              const downloadRes = await Taro.cloud.getTempFileURL({
-                fileList: fileIds
-              })
-              
-              const urlMap = {}
-              downloadRes.fileList?.forEach((file, idx) => {
-                if (file.tempFileURL) {
-                  urlMap[fileIds[idx]] = file.tempFileURL
-                }
-              })
-              
-              rankingList.value = rawList.map(item => {
-                if (item.avatar.startsWith('cloud://')) {
-                  return {
-                    ...item,
-                    avatar: urlMap[item.avatar] || item.avatar
-                  }
-                }
-                return item
-              })
-            } catch (downloadErr) {
-              console.error('getTempFileURL error, using cloud:// URL directly', downloadErr)
-              rankingList.value = rawList
-            }
-          } else {
-            rankingList.value = rawList
-          }
           
           myRank.value = res.result.myRank || 0
         } else {
@@ -226,39 +182,32 @@ async function loadRanking() {
           rankingList.value = mockRankingData.map(item => ({
             nickName: item.nickName,
             bestTime: item.bestTime,
-            errorCount: item.bestError,
-            avatar: ''
+            errorCount: item.bestError
           }))
           myRank.value = 0
         }
       } else {
-        console.log('loadRanking: empty result, using mock data')
-        rankingList.value = mockRankingData.map(item => ({
-          nickName: item.nickName,
-          bestTime: item.bestTime,
-          errorCount: item.bestError,
-          avatar: ''
-        }))
-        myRank.value = 0
+          rankingList.value = mockRankingData.map(item => ({
+            nickName: item.nickName,
+            bestTime: item.bestTime,
+            errorCount: item.bestError
+          }))
+          myRank.value = 0
       }
     } else {
-      console.log('loadRanking: cloud not available, using mock data')
       rankingList.value = mockRankingData.map(item => ({
         nickName: item.nickName,
         bestTime: item.bestTime,
-        errorCount: item.bestError,
-        avatar: ''
+        errorCount: item.bestError
       }))
       myRank.value = 0
     }
   } catch (e) {
     console.error('loadRanking error', e)
-    console.log('Using mock data as fallback')
     rankingList.value = mockRankingData.map(item => ({
       nickName: item.nickName,
       bestTime: item.bestTime,
-      errorCount: item.bestError,
-      avatar: ''
+      errorCount: item.bestError
     }))
     myRank.value = 0
   } finally {
@@ -320,7 +269,7 @@ useDidShow(() => {
   height: 44rpx;
 
   .nav-title {
-    font-size: 28rpx;
+    font-size: 32rpx;
     font-weight: bold;
     color: $purple-deep;
   }
@@ -347,7 +296,7 @@ useDidShow(() => {
     flex-shrink: 0;
 
     .tab-text {
-      font-size: 22rpx;
+      font-size: 26rpx;
       color: $gray-text;
     }
 
@@ -472,24 +421,6 @@ useDidShow(() => {
     .user-info {
       display: flex;
       align-items: center;
-      gap: 12rpx;
-
-      .user-avatar-img {
-        width: 40rpx;
-        height: 40rpx;
-        border-radius: 50%;
-      }
-
-      .user-avatar-small {
-        width: 40rpx;
-        height: 40rpx;
-        border-radius: 50%;
-        background-color: #F0F0F0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 22rpx;
-      }
 
       .user-name {
         font-size: 24rpx;
