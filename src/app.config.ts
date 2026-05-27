@@ -22,20 +22,20 @@ export default defineAppConfig({
       {
         pagePath: 'pages/index/index',
         text: '首页',
-        iconPath: 'assets/images/tabbar/transparent.png',
-        selectedIconPath: 'assets/images/tabbar/transparent.png'
+        iconPath: 'assets/images/tabbar/home.png',
+        selectedIconPath: 'assets/images/tabbar/home_active.png'
       },
       {
         pagePath: 'pages/ranking/index',
         text: '排行榜',
-        iconPath: 'assets/images/tabbar/transparent.png',
-        selectedIconPath: 'assets/images/tabbar/transparent.png'
+        iconPath: 'assets/images/tabbar/ranking.png',
+        selectedIconPath: 'assets/images/tabbar/ranking_active.png'
       },
       {
         pagePath: 'pages/profile/index',
         text: '个人中心',
-        iconPath: 'assets/images/tabbar/transparent.png',
-        selectedIconPath: 'assets/images/tabbar/transparent.png'
+        iconPath: 'assets/images/tabbar/profile.png',
+        selectedIconPath: 'assets/images/tabbar/profile_active.png'
       }
     ]
   }
