@@ -3,7 +3,7 @@
     <view class="user-header">
       <view class="user-info">
         <view class="avatar-wrap">
-          <view v-if="userStore.isLogin && userStore.userInfo.avatarUrl && !avatarLoadError && (userStore.userInfo.avatarUrl.indexOf('http') === 0 || userStore.userInfo.avatarUrl.indexOf('cloud://') === 0)" class="avatar avatar-url">
+          <view v-if="userStore.isLogin && userStore.userInfo.avatarUrl && !avatarLoadError" class="avatar avatar-url">
             <image class="avatar-img" :src="userStore.userInfo.avatarUrl" mode="aspectFill" @error="handleAvatarError" />
           </view>
           <view v-else class="avatar avatar-emoji-wrap">
@@ -58,7 +58,7 @@
           <view v-if="userStore.hasBestRecord(lv)">
             <text class="best-time">{{ formatTime(userStore.getBestTime(lv) || 0) }}秒</text>
             <view class="best-bottom">
-              <text class="best-error">{{ userStore.getBestError(lv) }}次错误</text>
+              <text class="best-error">{{ userStore.getBestError(lv) ?? 0 }}次错误</text>
               <text class="best-rating" :class="getRatingClass(userStore.getBestTime(lv) || 0, lv)">{{ getRating(userStore.getBestTime(lv) || 0, lv) }}</text>
             </view>
           </view>
@@ -69,8 +69,6 @@
         </view>
       </view>
     </view>
-
-    
 
     <view v-if="showLogoutModal" class="modal-mask" @tap="showLogoutModal = false">
       <view class="modal-content" @tap.stop>
@@ -91,6 +89,22 @@
   </view>
 </template>
 
+<script>
+export default {
+  onShareAppMessage() {
+    return {
+      title: '舒尔特方格 - 专注力训练',
+      path: '/pages/index/index'
+    }
+  },
+  onShareTimeline() {
+    return {
+      title: '舒尔特方格 - 专注力训练'
+    }
+  }
+}
+</script>
+
 <script setup>
 import LoginDialog from '@/components/LoginDialog.vue'
 import { ref } from 'vue'
@@ -108,8 +122,7 @@ const avatarLoadError = ref(false)
 function handleAvatarError() {
   avatarLoadError.value = true
   if (userStore.userInfo && userStore.userInfo.avatarUrl) {
-    userStore.userInfo.avatarUrl = ''
-    userStore.saveToStorage()
+    userStore.clearAvatarUrl()
   }
 }
 
@@ -151,10 +164,12 @@ function getRatingClass(time, level) {
   const rating = getRating(time, level)
   return `rating-${rating}`
 }
+
+
 </script>
 
 <style lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables' as *;
 
 @keyframes signSuccess {
   0% { transform: scale(1); }

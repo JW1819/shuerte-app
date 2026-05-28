@@ -1,13 +1,14 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import Taro from '@tarojs/taro'
+import { CLOUD_ENV_ID } from '@/utils/index'
 import './app.scss'
 
 const App = createApp({
   onLaunch() {
     if (Taro.cloud) {
       Taro.cloud.init({
-        env: 'cloud1-d7g92q5ti56030287',
+        env: CLOUD_ENV_ID,
         traceUser: true
       })
     }

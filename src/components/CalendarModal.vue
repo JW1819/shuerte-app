@@ -187,7 +187,7 @@ function handleClose() {
 </script>
 
 <style lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables' as *;
 
 .modal-mask {
   position: fixed;

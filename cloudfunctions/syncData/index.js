@@ -5,7 +5,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
 exports.main = async (event) => {
-  const { openId, nickName, avatarUrl, scores, continuousSign, totalGameCount, totalTime, signLog } = event
+  const { nickName, avatarUrl, scores, continuousSign, totalGameCount, totalTime, signLog } = event
   const wxContext = cloud.getWXContext()
   const userOpenId = wxContext.OPENID
 
@@ -24,7 +24,17 @@ exports.main = async (event) => {
     }
 
     if (userRes.data.length > 0) {
-      await db.collection('users').doc(userRes.data[0]._id).update({ data: userData })
+      const existing = userRes.data[0]
+      const hasChanges =
+        userData.nickName !== existing.nickName ||
+        userData.avatarUrl !== existing.avatarUrl ||
+        userData.continuousSign !== existing.continuousSign ||
+        userData.totalGameCount !== existing.totalGameCount ||
+        userData.totalTime !== existing.totalTime
+
+      if (hasChanges) {
+        await db.collection('users').doc(existing._id).update({ data: userData })
+      }
     } else {
       userData.createTime = db.serverDate()
       await db.collection('users').add({ data: userData })
@@ -32,11 +42,20 @@ exports.main = async (event) => {
 
     if (scores && typeof scores === 'object') {
       const levelKeys = Object.keys(scores)
-      for (const level of levelKeys) {
+
+      const existResults = await Promise.all(
+        levelKeys.map(level =>
+          db.collection('scores')
+            .where({ openId: userOpenId, level: Number(level) })
+            .get()
+        )
+      )
+
+      const updateTasks = []
+      for (let i = 0; i < levelKeys.length; i++) {
+        const level = levelKeys[i]
         const scoreData = scores[level]
-        const existRes = await db.collection('scores')
-          .where({ openId: userOpenId, level: Number(level) })
-          .get()
+        const existRes = existResults[i]
 
         const record = {
           openId: userOpenId,
@@ -51,13 +70,19 @@ exports.main = async (event) => {
         if (existRes.data.length > 0) {
           const existing = existRes.data[0]
           if (scoreData.bestTime < existing.bestTime) {
-            await db.collection('scores').doc(existing._id).update({ data: record })
+            updateTasks.push(
+              db.collection('scores').doc(existing._id).update({ data: record })
+            )
           }
         } else {
           record.createTime = db.serverDate()
-          await db.collection('scores').add({ data: record })
+          updateTasks.push(
+            db.collection('scores').add({ data: record })
+          )
         }
       }
+
+      await Promise.all(updateTasks)
     }
 
     return { success: true }

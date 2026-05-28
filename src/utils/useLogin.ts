@@ -8,16 +8,63 @@ const showLoginDialog = ref(false)
 const loginAvatarUrl = ref('')
 const loginAvatarFileId = ref('')
 const loginNickName = ref('')
+const privacyAuthorized = ref(false)
 let pendingSuccessHandler: LoginSuccessHandler | null = null
+
+const PRIVACY_AUTH_KEY = 'shuerte_privacy_auth'
+
+function requirePrivacy(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof Taro.requirePrivacyAuthorize === 'function') {
+      Taro.requirePrivacyAuthorize({
+        success: () => resolve(true),
+        fail: () => resolve(false)
+      })
+    } else {
+      resolve(true)
+    }
+  })
+}
+
+function loadPrivacyAuth(): boolean {
+  try {
+    return Taro.getStorageSync(PRIVACY_AUTH_KEY) === true
+  } catch {
+    return false
+  }
+}
+
+function savePrivacyAuth(authorized: boolean) {
+  try {
+    Taro.setStorageSync(PRIVACY_AUTH_KEY, authorized)
+  } catch {
+    // ignore
+  }
+}
 
 export function useLogin() {
   const userStore = useUserStore()
 
-  function openLoginDialog(onLoggedIn?: LoginSuccessHandler) {
-    pendingSuccessHandler = onLoggedIn !== null && onLoggedIn !== undefined ? onLoggedIn : null
+  async function openLoginDialog(onLoggedIn?: LoginSuccessHandler) {
+    pendingSuccessHandler = onLoggedIn ?? null
     loginAvatarUrl.value = (userStore.userInfo && userStore.userInfo.avatarUrl) || ''
     loginNickName.value =
       userStore.userInfo && userStore.userInfo.nickName !== '游客' ? userStore.userInfo.nickName : ''
+
+    const cachedAuth = loadPrivacyAuth()
+    if (cachedAuth) {
+      privacyAuthorized.value = true
+      showLoginDialog.value = true
+      return
+    }
+
+    const authorized = await requirePrivacy()
+    if (!authorized) {
+      Taro.showToast({ title: '需要同意隐私协议才能登录', icon: 'none' })
+      return
+    }
+    savePrivacyAuth(true)
+    privacyAuthorized.value = true
     showLoginDialog.value = true
   }
 
@@ -37,17 +84,28 @@ export function useLogin() {
       Taro.showLoading({ title: '上传头像中...' })
       
       if (!Taro.cloud) {
-        const res = await Taro.saveFile({ tempFilePath: avatarUrl })
-          .catch(() => ({ savedFilePath: avatarUrl }))
-        loginAvatarUrl.value = res.savedFilePath || avatarUrl
+        try {
+          const res = await Taro.saveFile({ tempFilePath: avatarUrl })
+          loginAvatarUrl.value = (res as { savedFilePath: string }).savedFilePath || avatarUrl
+        } catch (err) {
+          console.error('save file error', err)
+          loginAvatarUrl.value = avatarUrl
+        }
         Taro.hideLoading()
         return
       }
 
-      const fileInfo = await Taro.getFileInfo({ filePath: avatarUrl })
-      if (!fileInfo.size) throw new Error('文件无效')
+      let fileInfoSize = 0
+      try {
+        const fileInfo = await Taro.getFileInfo({ filePath: avatarUrl })
+        fileInfoSize = (fileInfo as { size: number }).size || 0
+      } catch (err) {
+        console.error('getFileInfo error', err)
+        fileInfoSize = 0
+      }
+      if (!fileInfoSize) throw new Error('文件无效')
 
-      const cloudPath = `avatars/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.png`
+      const cloudPath = `avatars/${Date.now()}_${Math.random().toString(36).substring(2, 11)}.png`
       const uploadRes = await Taro.cloud.uploadFile({
         cloudPath,
         filePath: avatarUrl
@@ -64,8 +122,8 @@ export function useLogin() {
           } else {
             loginAvatarUrl.value = uploadRes.fileID
           }
-        } catch (e) {
-          console.log('getTempFileURL failed, using fileID')
+        } catch (err) {
+          console.error('getTempFileURL error', err)
           loginAvatarUrl.value = uploadRes.fileID
         }
       } else {
@@ -76,8 +134,13 @@ export function useLogin() {
     } catch (err) {
       console.error('avatar upload error', err)
       Taro.hideLoading()
-      const res = await Taro.saveFile({ tempFilePath: avatarUrl }).catch(() => ({ savedFilePath: avatarUrl }))
-      loginAvatarUrl.value = res.savedFilePath || avatarUrl
+      try {
+        const res = await Taro.saveFile({ tempFilePath: avatarUrl })
+        loginAvatarUrl.value = (res as { savedFilePath: string }).savedFilePath || avatarUrl
+      } catch (saveErr) {
+        console.error('save file fallback error', saveErr)
+        loginAvatarUrl.value = avatarUrl
+      }
       Taro.showToast({ title: '头像上传失败，已使用本地路径', icon: 'none' })
     }
   }
@@ -106,6 +169,7 @@ export function useLogin() {
 
   function cancelLogin() {
     showLoginDialog.value = false
+    privacyAuthorized.value = false
     pendingSuccessHandler = null
   }
 
@@ -113,6 +177,7 @@ export function useLogin() {
     showLoginDialog,
     loginAvatarUrl,
     loginNickName,
+    privacyAuthorized,
     openLoginDialog,
     onChooseAvatar,
     onNicknameInput,

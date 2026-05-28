@@ -101,9 +101,25 @@
   </view>
 </template>
 
+<script>
+export default {
+  onShareAppMessage() {
+    return {
+      title: '舒尔特方格 - 全网排行榜',
+      path: '/pages/ranking/index'
+    }
+  },
+  onShareTimeline() {
+    return {
+      title: '舒尔特方格 - 全网排行榜'
+    }
+  }
+}
+</script>
+
 <script setup>
 import LoginDialog from '@/components/LoginDialog.vue'
-import { ref, onMounted } from 'vue'
+import { ref, shallowRef, onMounted } from 'vue'
 import Taro, { useRouter, useDidShow } from '@tarojs/taro'
 import { useUserStore } from '@/store/user'
 import { LEVEL_CONFIG, formatTime } from '@/utils/index'
@@ -120,13 +136,8 @@ const myRank = ref(0)
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 
-const mockRankingData = [
-  { nickName: '小明', bestTime: 4500, bestError: 0 },
-  { nickName: '小红', bestTime: 5200, bestError: 1 },
-  { nickName: '小华', bestTime: 6100, bestError: 0 },
-  { nickName: '小李', bestTime: 7300, bestError: 2 },
-  { nickName: '小张', bestTime: 8000, bestError: 1 },
-]
+const cache = shallowRef({})
+let currentTask = null
 
 const { openLoginDialog } = useLogin()
 
@@ -153,73 +164,92 @@ function getMedalIcon(rank) {
   return ''
 }
 
-async function loadRanking() {
+async function loadRanking(forceRefresh = false) {
   isLoading.value = true
+
+  const level = currentLevel.value
+
+  if (!forceRefresh && cache.value[level]) {
+    rankingList.value = cache.value[level].list
+    myRank.value = cache.value[level].rank
+    isLoading.value = false
+    isRefreshing.value = false
+    return
+  }
+
+  if (currentTask) {
+    currentTask.cancel()
+  }
+
+  let cancelled = false
+  currentTask = { cancel: () => { cancelled = true } }
 
   try {
     if (Taro.cloud) {
       console.log('loadRanking: calling cloud function')
-      const res = await Taro.cloud.callFunction({
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('timeout')), 10000)
+      })
+
+      const requestPromise = Taro.cloud.callFunction({
         name: 'getRanking',
         data: {
           level: currentLevel.value,
           myOpenId: userStore.userInfo.openId || ''
         }
       })
+
+      const res = await Promise.race([requestPromise, timeoutPromise])
+
+      if (cancelled) return
+
       console.log('loadRanking: cloud function result', res)
 
       if (res && res.result) {
         if (res.result.success && res.result.data && Array.isArray(res.result.data)) {
-          rankingList.value = res.result.data.map(item => ({
+          const list = res.result.data.map(item => ({
             nickName: item.nickName || '用户',
             bestTime: item.bestTime,
             errorCount: item.bestError || 0
           }))
-          
+
+          rankingList.value = list
           myRank.value = res.result.myRank || 0
+
+          cache.value = { ...cache.value, [level]: { list, rank: myRank.value } }
         } else {
-          console.log('loadRanking: no data or not success, using mock data')
-          rankingList.value = mockRankingData.map(item => ({
-            nickName: item.nickName,
-            bestTime: item.bestTime,
-            errorCount: item.bestError
-          }))
+          rankingList.value = []
           myRank.value = 0
         }
       } else {
-          rankingList.value = mockRankingData.map(item => ({
-            nickName: item.nickName,
-            bestTime: item.bestTime,
-            errorCount: item.bestError
-          }))
-          myRank.value = 0
+        rankingList.value = []
+        myRank.value = 0
       }
     } else {
-      rankingList.value = mockRankingData.map(item => ({
-        nickName: item.nickName,
-        bestTime: item.bestTime,
-        errorCount: item.bestError
-      }))
+      rankingList.value = []
       myRank.value = 0
     }
   } catch (e) {
     console.error('loadRanking error', e)
-    rankingList.value = mockRankingData.map(item => ({
-      nickName: item.nickName,
-      bestTime: item.bestTime,
-      errorCount: item.bestError
-    }))
+    if (cancelled) return
+    rankingList.value = []
     myRank.value = 0
   } finally {
-    isLoading.value = false
-    isRefreshing.value = false
+    if (!cancelled) {
+      isLoading.value = false
+      isRefreshing.value = false
+    }
+    currentTask = null
   }
 }
 
 function onRefresh() {
   isRefreshing.value = true
-  loadRanking()
+  loadRanking(true)
 }
+
+
 
 onMounted(() => {
   if (router.params.level) {
@@ -231,15 +261,15 @@ onMounted(() => {
 useDidShow(() => {
   const pendingLevel = Taro.getStorageSync('pendingRankingLevel')
   if (pendingLevel) {
-    currentLevel.value = Number(pendingLevel)
     Taro.removeStorageSync('pendingRankingLevel')
+    currentLevel.value = Number(pendingLevel)
     loadRanking()
   }
 })
 </script>
 
 <style lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables' as *;
 
 @keyframes spin {
   from { transform: rotate(0deg); }

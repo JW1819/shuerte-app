@@ -30,10 +30,13 @@
       <text v-else class="compare-hint">暂无历史记录，继续加油</text>
     </view>
 
-    <view class="percent-area">
+    <view v-if="beatPercent !== null" class="percent-area">
       <text class="percent-title">超越全网</text>
       <text class="percent-value">{{ beatPercent }}% 用户</text>
-      <text v-if="!userStore.isLogin" class="percent-hint">登录后可参与全网排行</text>
+    </view>
+    <view v-else-if="userStore.isLogin" class="percent-area">
+      <text class="percent-title">超越全网</text>
+      <text class="percent-value loading-text">计算中...</text>
     </view>
 
     <view class="action-area">
@@ -48,17 +51,30 @@
       </view>
     </view>
 
-    <view class="ad-area">
-      <text class="ad-placeholder">广告区域</text>
-    </view>
   </view>
 </template>
+
+<script>
+export default {
+  onShareAppMessage() {
+    return {
+      title: '舒尔特方格 - 专注力训练',
+      path: '/pages/index/index'
+    }
+  },
+  onShareTimeline() {
+    return {
+      title: '舒尔特方格 - 专注力训练'
+    }
+  }
+}
+</script>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import Taro, { useRouter } from '@tarojs/taro'
 import { useUserStore } from '@/store/user'
-import { LEVEL_CONFIG, getRating, getRatingColor, formatTime } from '@/utils/index'
+import { LEVEL_CONFIG, getRating, getRatingColor, formatTime, validateLevel } from '@/utils/index'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -66,8 +82,8 @@ const userStore = useUserStore()
 const level = ref(3)
 const useTime = ref(0)
 const errorCount = ref(0)
-const bestTime = ref(null)
-const beatPercent = ref(0)
+const bestTime = ref<number | null>(null)
+const beatPercent = ref<number | null>(null)
 
 const rating = computed(() => getRating(level.value, useTime.value))
 const ratingColor = computed(() => getRatingColor(rating.value))
@@ -94,34 +110,45 @@ function goRanking() {
 }
 
 onMounted(() => {
-  level.value = Number(router.params.level) || 3
-  useTime.value = Number(router.params.time) || 0
-  errorCount.value = Number(router.params.errors) || 0
+  level.value = validateLevel(Number(router.params.level) || 3)
+  useTime.value = Math.max(0, Number(router.params.time) || 0)
+  errorCount.value = Math.max(0, Number(router.params.errors) || 0)
   bestTime.value = userStore.getBestTime(level.value)
-  const total = level.value * level.value
-  const avgTime = useTime.value / total
-  const thresholds = {
-    3: { s: 800, a: 1200, b: 2000, c: 3500 },
-    4: { s: 1500, a: 2500, b: 4000, c: 7000 },
-    5: { s: 3000, a: 5000, b: 8000, c: 14000 },
-    6: { s: 5000, a: 8000, b: 13000, c: 22000 },
-    7: { s: 8000, a: 13000, b: 20000, c: 35000 },
-    8: { s: 12000, a: 20000, b: 32000, c: 55000 }
+
+  if (userStore.isLogin && userStore.userInfo.openId) {
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('timeout')), 8000)
+    })
+
+    const requestPromise = Taro.cloud.callFunction({
+      name: 'getRanking',
+      data: {
+        level: level.value,
+        myOpenId: userStore.userInfo.openId
+      }
+    })
+
+    Promise.race([requestPromise, timeoutPromise])
+      .then(res => {
+        if (res && res.result && res.result.success && res.result.total > 0 && res.result.myRank > 0) {
+          const total = res.result.total
+          const myRank = res.result.myRank
+          beatPercent.value = Math.round(((total - myRank) / total) * 100)
+        } else {
+          beatPercent.value = null
+        }
+      })
+      .catch(() => {
+        beatPercent.value = null
+      })
+  } else {
+    beatPercent.value = null
   }
-  const t = thresholds[level.value] || thresholds[5]
-  let pct = 95
-  if (avgTime <= t.s) pct = 95
-  else if (avgTime <= t.a) pct = 80
-  else if (avgTime <= t.b) pct = 60
-  else if (avgTime <= t.c) pct = 35
-  else pct = 15
-  const offset = Math.floor(avgTime) % 5 - 2
-  beatPercent.value = Math.max(5, Math.min(99, pct + offset))
 })
 </script>
 
 <style lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables' as *;
 
 @keyframes ratingGlow {
   0%, 100% { filter: drop-shadow(0 0 15rpx currentColor); }
@@ -258,12 +285,11 @@ onMounted(() => {
     font-weight: bold;
     color: $orange-light;
     margin-top: 4rpx;
-  }
 
-  .percent-hint {
-    font-size: 12rpx;
-    color: $gray-text;
-    margin-top: 4rpx;
+    &.loading-text {
+      font-weight: normal;
+      color: $gray-text;
+    }
   }
 }
 
@@ -272,22 +298,5 @@ onMounted(() => {
   justify-content: center;
   gap: 20rpx;
   padding: 20rpx 32rpx;
-}
-
-.ad-area {
-  padding: 16rpx 32rpx;
-  margin-top: auto;
-
-  .ad-placeholder {
-    width: 100%;
-    height: 80rpx;
-    background-color: #F0F0F0;
-    border-radius: 8rpx;
-    text-align: center;
-    line-height: 80rpx;
-    font-size: 14rpx;
-    color: $gray-text;
-    display: block;
-  }
 }
 </style>

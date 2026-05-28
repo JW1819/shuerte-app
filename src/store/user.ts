@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import Taro from '@tarojs/taro'
-import { getToday, LEVEL_CONFIG } from '@/utils/index'
+import { getToday } from '@/utils/index'
 
 const STORAGE_KEYS = {
   USER: 'shuerte_user',
@@ -13,6 +13,9 @@ const STORAGE_KEYS = {
 }
 
 const MAX_GAME_LOG = 200
+const SYNC_DEBOUNCE_MS = 3000
+let syncTimer: ReturnType<typeof setTimeout> | null = null
+let lastSyncedData: Record<string, unknown> | null = null
 
 export const useUserStore = defineStore('user', () => {
   const isLogin = ref(false)
@@ -81,17 +84,20 @@ export const useUserStore = defineStore('user', () => {
 
   function saveToStorage() {
     try {
-      Taro.setStorageSync(STORAGE_KEYS.IS_LOGIN, isLogin.value)
-      Taro.setStorageSync(STORAGE_KEYS.USER_INFO, userInfo.value)
-      Taro.setStorageSync(STORAGE_KEYS.USER, {
-        continuousSign: continuousSign.value,
-        totalGameCount: totalGameCount.value,
-        totalTime: totalTime.value,
-        lastSignDate: lastSignDate.value
+      Taro.setStorage({ key: STORAGE_KEYS.IS_LOGIN, data: isLogin.value })
+      Taro.setStorage({ key: STORAGE_KEYS.USER_INFO, data: userInfo.value })
+      Taro.setStorage({
+        key: STORAGE_KEYS.USER,
+        data: {
+          continuousSign: continuousSign.value,
+          totalGameCount: totalGameCount.value,
+          totalTime: totalTime.value,
+          lastSignDate: lastSignDate.value
+        }
       })
-      Taro.setStorageSync(STORAGE_KEYS.SCORES, scores.value)
-      Taro.setStorageSync(STORAGE_KEYS.SIGN_LOG, signLog.value)
-      Taro.setStorageSync(STORAGE_KEYS.GAME_LOG, gameLog.value)
+      Taro.setStorage({ key: STORAGE_KEYS.SCORES, data: scores.value })
+      Taro.setStorage({ key: STORAGE_KEYS.SIGN_LOG, data: signLog.value })
+      Taro.setStorage({ key: STORAGE_KEYS.GAME_LOG, data: gameLog.value })
     } catch (e) {
       console.error('saveToStorage error', e)
     }
@@ -165,9 +171,12 @@ export const useUserStore = defineStore('user', () => {
     try {
       if (Taro.cloud) {
         const loginRes = await Taro.cloud.callFunction({ name: 'login' })
-        if (loginRes.result && loginRes.result.openId) {
-          userInfo.value.openId = loginRes.result.openId
+        const result = loginRes.result as Record<string, unknown> | undefined
+        if (result && !result.errMsg && !result.error && result.openId) {
+          userInfo.value.openId = String(result.openId)
           saveToStorage()
+        } else if (result && (result.errMsg || result.error)) {
+          console.error('login cloud function returned error', result)
         }
       }
     } catch (e) {
@@ -180,23 +189,40 @@ export const useUserStore = defineStore('user', () => {
   async function syncToCloud() {
     if (!isLogin.value || !Taro.cloud) return
 
-    try {
-      await Taro.cloud.callFunction({
-        name: 'syncData',
-        data: {
-          openId: userInfo.value.openId,
-          nickName: userInfo.value.nickName,
-          avatarUrl: userInfo.value.avatarUrl,
-          scores: scores.value,
-          continuousSign: continuousSign.value,
-          totalGameCount: totalGameCount.value,
-          totalTime: totalTime.value,
-          signLog: signLog.value
-        }
-      })
-    } catch (e) {
-      console.error('syncToCloud error', e)
+    if (syncTimer) {
+      clearTimeout(syncTimer)
     }
+    syncTimer = setTimeout(async () => {
+      syncTimer = null
+      const dataToSync = {
+        nickName: userInfo.value.nickName,
+        avatarUrl: userInfo.value.avatarUrl,
+        scores: scores.value,
+        continuousSign: continuousSign.value,
+        totalGameCount: totalGameCount.value,
+        totalTime: totalTime.value,
+        signLog: signLog.value
+      }
+
+      if (JSON.stringify(dataToSync) === lastSyncedData) {
+        return
+      }
+
+      try {
+        await Taro.cloud.callFunction({
+          name: 'syncData',
+          data: dataToSync
+        })
+        lastSyncedData = JSON.stringify(dataToSync)
+      } catch (e) {
+        console.error('syncToCloud error', e)
+      }
+    }, SYNC_DEBOUNCE_MS)
+  }
+
+  function clearAvatarUrl() {
+    userInfo.value.avatarUrl = ''
+    saveToStorage()
   }
 
   function logout() {
@@ -209,6 +235,7 @@ export const useUserStore = defineStore('user', () => {
     totalGameCount.value = 0
     totalTime.value = 0
     lastSignDate.value = ''
+    lastSyncedData = null
     saveToStorage()
   }
 
@@ -218,7 +245,7 @@ export const useUserStore = defineStore('user', () => {
 
   function initStore() {
     try {
-      if (typeof Taro !== 'undefined' && Taro.getStorageSync) {
+      if (typeof Taro !== 'undefined' && typeof Taro.getStorageSync === 'function') {
         loadFromStorage()
       }
     } catch (e) {
@@ -244,6 +271,7 @@ export const useUserStore = defineStore('user', () => {
     hasBestRecord,
     login,
     logout,
+    clearAvatarUrl,
     refreshUserInfo,
     loadFromStorage,
     saveToStorage,

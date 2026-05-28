@@ -50,10 +50,6 @@
       </view>
     </view>
 
-    <view class="ad-area">
-      <text class="ad-placeholder">广告区域</text>
-    </view>
-
     <view v-if="phase === 'countdown' || phase === 'ready'" class="countdown-overlay">
       <view class="countdown-content">
         <view v-if="phase === 'countdown'" class="countdown-circle">
@@ -81,6 +77,22 @@
     </view>
   </view>
 </template>
+
+<script>
+export default {
+  onShareAppMessage() {
+    return {
+      title: '舒尔特方格 - 专注力训练',
+      path: '/pages/index/index'
+    }
+  },
+  onShareTimeline() {
+    return {
+      title: '舒尔特方格 - 专注力训练'
+    }
+  }
+}
+</script>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
@@ -251,10 +263,12 @@ onUnmounted(() => {
     cdIntervalRef.value = null
   }
 })
+
+
 </script>
 
 <style lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables' as *;
 
 @keyframes countdownPulse {
   0% { transform: scale(1.8); opacity: 0; }
@@ -412,24 +426,6 @@ onUnmounted(() => {
   padding: $spacing-md $spacing-lg;
   padding-bottom: calc(#{$spacing-md} + constant(safe-area-inset-bottom));
   padding-bottom: calc(#{$spacing-md} + env(safe-area-inset-bottom));
-}
-
-.ad-area {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: $spacing-sm $spacing-lg;
-
-  .ad-placeholder {
-    width: 100%;
-    height: 80rpx;
-    background-color: #F0F0F0;
-    border-radius: 8rpx;
-    text-align: center;
-    line-height: 80rpx;
-    font-size: 14rpx;
-    color: $gray-text;
-  }
 }
 
 .modal-mask {

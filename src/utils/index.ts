@@ -1,4 +1,50 @@
-const LEVEL_CONFIG = {
+import Taro from '@tarojs/taro'
+
+type LevelType = 3 | 4 | 5 | 6 | 7 | 8
+type RatingType = 'S' | 'A' | 'B' | 'C'
+
+const CLOUD_ENV_ID = 'cloud1-d7g92q5ti56030287'
+
+interface LevelConfigItem {
+  name: string
+  size: number
+  bgColor: string
+  textColor: string
+  borderColor: string
+}
+
+interface RatingConfigItem {
+  S: number
+  A: number
+  B: number
+  C: number
+}
+
+interface GridCell {
+  number: number
+  color: string
+  clicked: boolean
+}
+
+interface CloudFunctionResult<T = unknown> {
+  success: boolean
+  data?: T
+  error?: string
+  errMsg?: string
+}
+
+interface RankingItem {
+  nickName: string
+  bestTime: number
+  bestError?: number
+}
+
+interface RankingResult extends CloudFunctionResult<RankingItem[]> {
+  total?: number
+  myRank?: number
+}
+
+const LEVEL_CONFIG: Record<LevelType, LevelConfigItem> = {
   3: { name: '入门', size: 3, bgColor: '#E0F0FF', textColor: '#5B9BD5', borderColor: '#A8D4F0' },
   4: { name: '初级', size: 4, bgColor: '#FFE0EC', textColor: '#D4739A', borderColor: '#F0A8C4' },
   5: { name: '经典', size: 5, bgColor: '#FFF8E0', textColor: '#C4A830', borderColor: '#F0E0A0' },
@@ -7,7 +53,7 @@ const LEVEL_CONFIG = {
   8: { name: '大神', size: 8, bgColor: '#FFF0E0', textColor: '#C88540', borderColor: '#F5C89A' }
 }
 
-const RATING_CONFIG = {
+const RATING_CONFIG: Record<LevelType, RatingConfigItem> = {
   3: { S: 5000, A: 8000, B: 12000, C: Infinity },
   4: { S: 10000, A: 16000, B: 24000, C: Infinity },
   5: { S: 18000, A: 28000, B: 40000, C: Infinity },
@@ -16,7 +62,7 @@ const RATING_CONFIG = {
   8: { S: 65000, A: 95000, B: 130000, C: Infinity }
 }
 
-const MACARON_COLORS = [
+const MACARON_COLORS: string[] = [
   '#7EB5D6', '#D4739A', '#C4A830', '#5BAA6F',
   '#8B7DA8', '#C88540', '#D68F7E', '#7EB5A8',
   '#A88BD6', '#D6B07E', '#7E9ED6', '#B0D67E',
@@ -35,7 +81,7 @@ const MACARON_COLORS = [
   '#7ED6A8', '#A87ED6', '#D6A87E', '#7ED6D6'
 ]
 
-function generateGrid(level) {
+function generateGrid(level: LevelType): GridCell[][] {
   const size = LEVEL_CONFIG[level].size
   const total = size * size
   const numbers = Array.from({ length: total }, (_, i) => i + 1)
@@ -43,9 +89,9 @@ function generateGrid(level) {
     const j = Math.floor(Math.random() * (i + 1));
     [numbers[i], numbers[j]] = [numbers[j], numbers[i]]
   }
-  const grid = []
+  const grid: GridCell[][] = []
   for (let i = 0; i < size; i++) {
-    const row = []
+    const row: GridCell[] = []
     for (let j = 0; j < size; j++) {
       const num = numbers[i * size + j]
       row.push({
@@ -59,7 +105,7 @@ function generateGrid(level) {
   return grid
 }
 
-function getRating(level, timeMs) {
+function getRating(level: LevelType, timeMs: number): RatingType {
   const config = RATING_CONFIG[level]
   if (timeMs <= config.S) return 'S'
   if (timeMs <= config.A) return 'A'
@@ -67,17 +113,17 @@ function getRating(level, timeMs) {
   return 'C'
 }
 
-function getRatingColor(rating) {
-  const colors = { S: '#5BAA6F', A: '#5B9BD5', B: '#C4A830', C: '#D4739A' }
+function getRatingColor(rating: RatingType): string {
+  const colors: Record<RatingType, string> = { S: '#5BAA6F', A: '#5B9BD5', B: '#C4A830', C: '#D4739A' }
   return colors[rating] || '#999999'
 }
 
-function formatTime(ms) {
+function formatTime(ms: number): string {
   const seconds = ms / 1000
   return seconds.toFixed(3)
 }
 
-function formatDuration(ms) {
+function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000)
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
@@ -85,18 +131,18 @@ function formatDuration(ms) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-function getToday() {
+function getToday(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function validateLevel(level: number): number {
+function validateLevel(level: number): LevelType {
   const l = Number(level) || 3
-  return (l >= 3 && l <= 8) ? l : 3
+  return (l >= 3 && l <= 8) ? l as LevelType : 3
 }
 
-function getLast30Days() {
-  const days = []
+function getLast30Days(): string[] {
+  const days: string[] = []
   const today = new Date()
   for (let i = 29; i >= 0; i--) {
     const d = new Date(today)
@@ -106,7 +152,37 @@ function getLast30Days() {
   return days
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs)
+    promise.then(resolve, reject).finally(() => clearTimeout(timer))
+  })
+}
+
+function cloudCall<T = unknown>(name: string, data?: Record<string, unknown>): Promise<CloudFunctionResult<T>> {
+  if (!Taro.cloud) {
+    return Promise.resolve({ success: false, error: 'cloud not available' })
+  }
+  return withTimeout(
+    Taro.cloud.callFunction({ name, data: data || {} }) as Promise<{ result: CloudFunctionResult<T> }>,
+    10000
+  ).then(res => res.result).catch(err => ({ success: false, error: String(err) }))
+}
+
+function safeParseJSON(str: string, fallback: unknown = null): unknown {
+  try {
+    return JSON.parse(str)
+  } catch {
+    return fallback
+  }
+}
+
+function deepEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
 export {
+  CLOUD_ENV_ID,
   LEVEL_CONFIG,
   RATING_CONFIG,
   MACARON_COLORS,
@@ -117,5 +193,11 @@ export {
   formatDuration,
   getToday,
   getLast30Days,
-  validateLevel
+  validateLevel,
+  withTimeout,
+  cloudCall,
+  safeParseJSON,
+  deepEqual
 }
+
+export type { LevelType, RatingType, LevelConfigItem, GridCell, CloudFunctionResult, RankingItem, RankingResult }

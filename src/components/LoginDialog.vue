@@ -48,7 +48,7 @@ const { showLoginDialog, loginAvatarUrl, loginNickName, cancelLogin, confirmLogi
 </script>
 
 <style lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables' as *;
 
 .login-modal-mask {
   position: fixed;

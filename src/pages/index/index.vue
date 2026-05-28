@@ -60,6 +60,22 @@
   </view>
 </template>
 
+<script>
+export default {
+  onShareAppMessage() {
+    return {
+      title: '舒尔特方格 - 专注力训练',
+      path: '/pages/index/index'
+    }
+  },
+  onShareTimeline() {
+    return {
+      title: '舒尔特方格 - 专注力训练'
+    }
+  }
+}
+</script>
+
 <script setup>
 import { ref, onMounted } from 'vue'
 import LoginDialog from '@/components/LoginDialog.vue'
@@ -95,7 +111,7 @@ function goTraining(level) {
 </script>
 
 <style lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables' as *;
 
 @keyframes float {
   0%, 100% {
