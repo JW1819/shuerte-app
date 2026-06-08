@@ -31,9 +31,9 @@
                 {{ myRank > 0 ? `第 ${myRank} 名` : '未上榜' }}
               </text>
             </view>
-            <view v-if="userStore.getBestTime(currentLevel)" class="my-rank-right">
+            <view v-if="myBestTime" class="my-rank-right">
               <text class="my-rank-time-label">最佳用时</text>
-              <text class="my-rank-time-value">{{ formatTime(userStore.getBestTime(currentLevel) || 0) }}秒</text>
+              <text class="my-rank-time-value">{{ formatTime(myBestTime) }}秒</text>
             </view>
           </view>
         </view>
@@ -41,8 +41,8 @@
       <template v-else>
         <view class="guest-rank-box">
           <view class="guest-rank-content">
-            <text v-if="userStore.getBestTime(currentLevel)" class="guest-rank-text">
-              本地最佳：{{ formatTime(userStore.getBestTime(currentLevel) || 0) }}秒
+            <text v-if="myBestTime" class="guest-rank-text">
+              本地最佳：{{ formatTime(myBestTime) }}秒
             </text>
             <text v-else class="guest-rank-text">登录后可参与全网排行</text>
           </view>
@@ -76,7 +76,7 @@
       </view>
       <view
         v-for="(item, idx) in rankingList"
-        :key="idx"
+        :key="`${item.openId || item.nickName}-${idx}`"
         class="list-row"
         :class="{ 'row-top-three': idx < 3 }"
         :style="{ backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#FFF8F0' }"
@@ -103,41 +103,37 @@
 
 <script>
 export default {
-  onShareAppMessage() {
-    return {
-      title: '舒尔特方格 - 全网排行榜',
-      path: '/pages/ranking/index'
-    }
-  },
-  onShareTimeline() {
-    return {
-      title: '舒尔特方格 - 全网排行榜'
-    }
+  shareConfig: {
+    title: '舒尔特方格 - 全网排行榜'
   }
 }
 </script>
 
 <script setup>
 import LoginDialog from '@/components/LoginDialog.vue'
-import { ref, shallowRef, onMounted } from 'vue'
+import { ref, shallowReactive, computed, onUnmounted } from 'vue'
 import Taro, { useRouter, useDidShow } from '@tarojs/taro'
 import { useUserStore } from '@/store/user'
-import { LEVEL_CONFIG, formatTime } from '@/utils/index'
+import { LEVEL_CONFIG, LEVELS, formatTime, cloudCall } from '@/utils/index'
 import { useLogin } from '@/utils/useLogin'
 
 const router = useRouter()
 const userStore = useUserStore()
 
-const levels = [3, 4, 5, 6, 7, 8]
+const levels = LEVELS
 const levelConfig = LEVEL_CONFIG
-const currentLevel = ref(3)
+const initialLevel = router.params.level ? Number(router.params.level) || 3 : 3
+const currentLevel = ref(initialLevel)
 const rankingList = ref([])
 const myRank = ref(0)
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 
-const cache = shallowRef({})
+// 用 shallowReactive 支持原地赋值,避免每次创建新对象让浅响应失效
+const cache = shallowReactive({})
 let currentTask = null
+
+const myBestTime = computed(() => userStore.getBestTime(currentLevel.value))
 
 const { openLoginDialog } = useLogin()
 
@@ -165,16 +161,20 @@ function getMedalIcon(rank) {
 }
 
 async function loadRanking(forceRefresh = false) {
-  isLoading.value = true
-
   const level = currentLevel.value
 
-  if (!forceRefresh && cache.value[level]) {
-    rankingList.value = cache.value[level].list
-    myRank.value = cache.value[level].rank
+  if (!forceRefresh && cache[level]) {
+    rankingList.value = cache[level].list
+    myRank.value = cache[level].rank
     isLoading.value = false
     isRefreshing.value = false
     return
+  }
+
+  // 已有数据时静默刷新,避免切 tab 闪 loading
+  const silentRefresh = forceRefresh && rankingList.value.length > 0
+  if (!silentRefresh) {
+    isLoading.value = true
   }
 
   if (currentTask) {
@@ -185,54 +185,33 @@ async function loadRanking(forceRefresh = false) {
   currentTask = { cancel: () => { cancelled = true } }
 
   try {
-    if (Taro.cloud) {
-      console.log('loadRanking: calling cloud function')
+    const res = await cloudCall('getRanking', {
+      level: currentLevel.value,
+      myOpenId: userStore.userInfo.openId || ''
+    })
 
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('timeout')), 10000)
-      })
+    if (cancelled) return
 
-      const requestPromise = Taro.cloud.callFunction({
-        name: 'getRanking',
-        data: {
-          level: currentLevel.value,
-          myOpenId: userStore.userInfo.openId || ''
-        }
-      })
+    if (res && res.success && Array.isArray(res.data)) {
+      const list = res.data.map(item => ({
+        nickName: item.nickName || '用户',
+        bestTime: item.bestTime,
+        errorCount: item.bestError || 0,
+        openId: item.openId || ''
+      }))
 
-      const res = await Promise.race([requestPromise, timeoutPromise])
+      rankingList.value = list
+      myRank.value = res.myRank || 0
 
-      if (cancelled) return
-
-      console.log('loadRanking: cloud function result', res)
-
-      if (res && res.result) {
-        if (res.result.success && res.result.data && Array.isArray(res.result.data)) {
-          const list = res.result.data.map(item => ({
-            nickName: item.nickName || '用户',
-            bestTime: item.bestTime,
-            errorCount: item.bestError || 0
-          }))
-
-          rankingList.value = list
-          myRank.value = res.result.myRank || 0
-
-          cache.value = { ...cache.value, [level]: { list, rank: myRank.value } }
-        } else {
-          rankingList.value = []
-          myRank.value = 0
-        }
-      } else {
-        rankingList.value = []
-        myRank.value = 0
-      }
+      // shallowReactive 支持原地赋值,不会创建新对象
+      cache[level] = { list, rank: myRank.value }
     } else {
       rankingList.value = []
       myRank.value = 0
     }
   } catch (e) {
-    console.error('loadRanking error', e)
     if (cancelled) return
+    console.error('loadRanking error', e)
     rankingList.value = []
     myRank.value = 0
   } finally {
@@ -251,20 +230,17 @@ function onRefresh() {
 
 
 
-onMounted(() => {
-  if (router.params.level) {
-    currentLevel.value = Number(router.params.level) || 3
+useDidShow(() => {
+  const pendingLevel = userStore.consumePendingRankingLevel()
+  if (pendingLevel != null) {
+    currentLevel.value = pendingLevel
   }
-  loadRanking()
+  // 每次切到该 tab 都强制刷新,保证破纪录后能立即看到新名次
+  loadRanking(true)
 })
 
-useDidShow(() => {
-  const pendingLevel = Taro.getStorageSync('pendingRankingLevel')
-  if (pendingLevel) {
-    Taro.removeStorageSync('pendingRankingLevel')
-    currentLevel.value = Number(pendingLevel)
-    loadRanking()
-  }
+onUnmounted(() => {
+  if (currentTask) currentTask.cancel()
 })
 </script>
 
@@ -432,15 +408,31 @@ useDidShow(() => {
     }
 
     .rank-medal {
-      width: 40rpx;
-      height: 40rpx;
+      width: 48rpx;
+      height: 48rpx;
       display: flex;
       align-items: center;
       justify-content: center;
+      border-radius: 50%;
       animation: bounce 0.5s ease-out;
 
       .medal-icon {
         font-size: 32rpx;
+      }
+
+      &.medal-1 {
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        box-shadow: 0 2rpx 8rpx rgba(255, 215, 0, 0.4);
+      }
+
+      &.medal-2 {
+        background: linear-gradient(135deg, #E0E0E8, #A8A8B0);
+        box-shadow: 0 2rpx 8rpx rgba(168, 168, 176, 0.4);
+      }
+
+      &.medal-3 {
+        background: linear-gradient(135deg, #D4A878, #C08050);
+        box-shadow: 0 2rpx 8rpx rgba(192, 128, 80, 0.4);
       }
     }
 

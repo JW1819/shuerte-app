@@ -31,16 +31,16 @@
               :key="day.date"
               class="calendar-day"
               :class="{
-                'day-signed': day.date && userStore.signLog.includes(day.date),
-                'day-today': day.isToday && !userStore.signLog.includes(day.date),
-                'day-today-signed': day.isToday && userStore.signLog.includes(day.date),
+                'day-signed': day.date && signedSet.has(day.date),
+                'day-today': day.isToday && !signedSet.has(day.date),
+                'day-today-signed': day.isToday && signedSet.has(day.date),
                 'day-future': day.isFuture,
                 'day-other-month': !day.isCurrentMonth
               }"
               @tap="handleCalendarTap(day)"
             >
               <text v-if="day.date" class="day-text">{{ day.dayNum }}</text>
-              <view v-if="day.date && userStore.signLog.includes(day.date)" class="day-checkmark">✓</view>
+              <view v-if="day.date && signedSet.has(day.date)" class="day-checkmark">✓</view>
             </view>
           </view>
         </view>
@@ -63,7 +63,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useUserStore } from '@/store/user'
-import { getToday, getLast30Days } from '@/utils/index'
+import { getToday } from '@/utils/index'
 import Taro from '@tarojs/taro'
 
 const props = defineProps({
@@ -83,6 +83,8 @@ const todayParts = today.split('-')
 const currentYear = ref(parseInt(todayParts[0]))
 const currentMonth = ref(parseInt(todayParts[1]))
 
+const signedSet = computed(() => new Set(userStore.signLog))
+
 const currentMonthText = computed(() => {
   return `${currentYear.value}年${currentMonth.value}月`
 })
@@ -92,7 +94,6 @@ const calendarWeeks = computed(() => {
   const firstDayOfMonth = new Date(currentYear.value, currentMonth.value - 1, 1)
   const startDayOfWeek = firstDayOfMonth.getDay()
   const todayDate = new Date(parseInt(todayParts[0]), parseInt(todayParts[1]) - 1, parseInt(todayParts[2]))
-  const signLog = userStore.signLog
 
   let week = []
   const weeks = []
@@ -113,7 +114,7 @@ const calendarWeeks = computed(() => {
     const dateStr = `${currentYear.value}-${String(currentMonth.value).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     const isToday = d.toDateString() === todayDate.toDateString()
     const isFuture = d > todayDate
-    
+
     week.push({
       date: dateStr,
       dayNum: day,
@@ -175,7 +176,7 @@ function handleCalendarTap(day) {
     Taro.showToast({ title: '请先登录', icon: 'none' })
     return
   }
-  if (day.isToday && !userStore.signLog.includes(day.date)) {
+  if (day.isToday && !signedSet.value.has(day.date)) {
     userStore.signIn()
     Taro.showToast({ title: '签到成功', icon: 'none', duration: 3000 })
   }

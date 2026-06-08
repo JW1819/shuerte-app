@@ -44,22 +44,48 @@
       </view>
     </view>
 
+    <view class="points-card">
+      <view class="points-header">
+        <text class="points-title">我的积分</text>
+        <text class="points-value">{{ userStore.points }}<text class="points-unit"> 分</text></text>
+      </view>
+      <view class="points-stats">
+        <view class="points-stat-item">
+          <text class="points-stat-num">{{ userStore.totalEarned }}</text>
+          <text class="points-stat-label">累计获得</text>
+        </view>
+        <view class="points-stat-divider"></view>
+        <view class="points-stat-item">
+          <text class="points-stat-num">{{ userStore.totalSpent }}</text>
+          <text class="points-stat-label">累计消耗</text>
+        </view>
+      </view>
+      <view class="points-actions">
+        <view class="points-btn points-btn-primary" @tap="goLottery">
+          <text class="points-btn-text">🎰 去抽奖</text>
+        </view>
+        <view class="points-btn points-btn-secondary" @tap="goShop">
+          <text class="points-btn-text">🛍️ 积分商城</text>
+        </view>
+      </view>
+    </view>
+
     <view class="best-area">
       <text class="section-title">各难度历史最佳</text>
       <view class="best-grid">
         <view
-          v-for="lv in levels"
-          :key="lv"
+          v-for="rec in bestRecords"
+          :key="rec.level"
           class="best-card card"
-          :style="{ backgroundColor: levelConfig[lv].bgColor }"
-          @tap="handleBestCardTap(lv)"
+          :style="{ backgroundColor: levelConfig[rec.level].bgColor }"
+          @tap="handleBestCardTap(rec.level)"
         >
-          <text class="best-level" :style="{ color: levelConfig[lv].textColor }">{{ lv }}×{{ lv }}</text>
-          <view v-if="userStore.hasBestRecord(lv)">
-            <text class="best-time">{{ formatTime(userStore.getBestTime(lv) || 0) }}秒</text>
+          <text class="best-level" :style="{ color: levelConfig[rec.level].textColor }">{{ rec.level }}×{{ rec.level }}</text>
+          <view v-if="rec.has">
+            <text class="best-time">{{ formatTime(rec.bestTime) }}秒</text>
             <view class="best-bottom">
-              <text class="best-error">{{ userStore.getBestError(lv) ?? 0 }}次错误</text>
-              <text class="best-rating" :class="getRatingClass(userStore.getBestTime(lv) || 0, lv)">{{ getRating(userStore.getBestTime(lv) || 0, lv) }}</text>
+              <text class="best-error">{{ rec.bestError }}次错误</text>
+              <text class="best-rating" :class="rec.ratingClass">{{ rec.rating }}</text>
             </view>
           </view>
           <view v-else>
@@ -70,54 +96,56 @@
       </view>
     </view>
 
-    <view v-if="showLogoutModal" class="modal-mask" @tap="showLogoutModal = false">
-      <view class="modal-content" @tap.stop>
-        <text class="modal-title">确定退出登录？</text>
-        <text class="modal-desc">退出后本地数据不丢失</text>
-        <view class="modal-actions">
-          <view class="btn btn-gray" @tap="showLogoutModal = false">
-            <text>取消</text>
-          </view>
-          <view class="btn btn-pink" @tap="confirmLogout">
-            <text>确定</text>
-          </view>
+    <Modal
+      :visible="showLogoutModal"
+      title="确定退出登录？"
+      desc="退出后本地数据不丢失"
+      @close="showLogoutModal = false"
+    >
+      <template #actions>
+        <view class="btn btn-gray" @tap="showLogoutModal = false">
+          <text>取消</text>
         </view>
-      </view>
-    </view>
+        <view class="btn btn-pink" @tap="confirmLogout">
+          <text>确定</text>
+        </view>
+      </template>
+    </Modal>
 
     <LoginDialog />
   </view>
 </template>
 
-<script>
-export default {
-  onShareAppMessage() {
-    return {
-      title: '舒尔特方格 - 专注力训练',
-      path: '/pages/index/index'
-    }
-  },
-  onShareTimeline() {
-    return {
-      title: '舒尔特方格 - 专注力训练'
-    }
-  }
-}
-</script>
-
 <script setup>
 import LoginDialog from '@/components/LoginDialog.vue'
-import { ref } from 'vue'
+import Modal from '@/components/Modal.vue'
+import { ref, computed, watch } from 'vue'
 import Taro from '@tarojs/taro'
 import { useUserStore } from '@/store/user'
-import { LEVEL_CONFIG, formatTime, formatDuration, getRating as getRatingUtil } from '@/utils/index'
+import { LEVEL_CONFIG, LEVELS, formatTime, formatDuration, getRating as getRatingUtil } from '@/utils/index'
 import { useLogin } from '@/utils/useLogin'
 
 const userStore = useUserStore()
-const levels = [3, 4, 5, 6, 7, 8]
+const levels = LEVELS
 const levelConfig = LEVEL_CONFIG
 const showLogoutModal = ref(false)
 const avatarLoadError = ref(false)
+
+const bestRecords = computed(() => {
+  return levels.map(lv => {
+    const bestTime = userStore.getBestTime(lv)
+    const has = bestTime != null
+    const rating = has ? getRatingUtil(lv, bestTime) : '-'
+    return {
+      level: lv,
+      has,
+      bestTime: bestTime || 0,
+      bestError: userStore.getBestError(lv),
+      rating,
+      ratingClass: `rating-${rating}`
+    }
+  })
+})
 
 function handleAvatarError() {
   avatarLoadError.value = true
@@ -125,6 +153,11 @@ function handleAvatarError() {
     userStore.clearAvatarUrl()
   }
 }
+
+watch(() => userStore.userInfo.avatarUrl, (newUrl) => {
+  // 头像 URL 变更(重新登录/重置)时清掉错误标志,让新头像有机会显示
+  if (newUrl) avatarLoadError.value = false
+})
 
 const { openLoginDialog } = useLogin()
 
@@ -136,6 +169,18 @@ function handleBestCardTap(lv) {
   Taro.navigateTo({
     url: `/pages/training/index?level=${lv}`
   })
+}
+
+function goLottery() {
+  if (!userStore.isLogin) {
+    openLoginDialog()
+    return
+  }
+  Taro.navigateTo({ url: '/pages/points/index' })
+}
+
+function goShop() {
+  Taro.navigateTo({ url: '/pages/shop/index' })
 }
 
 function handleLoginAction() {
@@ -152,20 +197,6 @@ function confirmLogout() {
   showLogoutModal.value = false
   Taro.showToast({ title: '已退出登录', icon: 'none' })
 }
-
-
-
-function getRating(time, level) {
-  if (!time || time <= 0) return '-'
-  return getRatingUtil(level, time)
-}
-
-function getRatingClass(time, level) {
-  const rating = getRating(time, level)
-  return `rating-${rating}`
-}
-
-
 </script>
 
 <style lang="scss">
@@ -331,6 +362,105 @@ function getRatingClass(time, level) {
   }
 }
 
+.points-card {
+  margin: 0 $spacing-md $spacing-md;
+  padding: $spacing-md $spacing-lg;
+  background: linear-gradient(135deg, #FFF3E8 0%, #FFE4CC 100%);
+  border-radius: $radius-card;
+  box-shadow: 0 2rpx 8rpx rgba(255, 138, 61, 0.15);
+
+  .points-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: $spacing-sm;
+  }
+
+  .points-title {
+    font-size: 26rpx;
+    font-weight: bold;
+    color: $text-dark;
+  }
+
+  .points-value {
+    font-size: 40rpx;
+    font-weight: 700;
+    color: #FF6A1F;
+  }
+
+  .points-unit {
+    font-size: 20rpx;
+    font-weight: 500;
+    color: #FF8A3D;
+  }
+
+  .points-stats {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: $spacing-lg;
+    padding: $spacing-xs 0 $spacing-md;
+  }
+
+  .points-stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .points-stat-num {
+    font-size: 26rpx;
+    font-weight: 600;
+    color: $text-dark;
+  }
+
+  .points-stat-label {
+    font-size: 20rpx;
+    color: $gray-text;
+    margin-top: 2rpx;
+  }
+
+  .points-stat-divider {
+    width: 2rpx;
+    height: 32rpx;
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  .points-actions {
+    display: flex;
+    gap: $spacing-sm;
+  }
+
+  .points-btn {
+    flex: 1;
+    padding: 16rpx 0;
+    border-radius: 30rpx;
+    text-align: center;
+    transition: transform 0.15s;
+  }
+
+  .points-btn:active {
+    transform: scale(0.96);
+  }
+
+  .points-btn-primary {
+    background: linear-gradient(135deg, #FF8A3D, #FF6A1F);
+    color: #fff;
+    box-shadow: 0 4rpx 12rpx rgba(255, 106, 31, 0.3);
+  }
+
+  .points-btn-secondary {
+    background: rgba(255, 255, 255, 0.9);
+    color: $purple-deep;
+    border: 2rpx solid rgba(255, 138, 61, 0.3);
+  }
+
+  .points-btn-text {
+    font-size: 26rpx;
+    font-weight: 600;
+  }
+}
+
 .best-area {
   padding: $spacing-md $spacing-lg;
   margin-top: $spacing-md;
@@ -461,46 +591,4 @@ function getRatingClass(time, level) {
 }
 
 
-
-.modal-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-
-  .modal-content {
-    background-color: #FFFFFF;
-    border-radius: $radius-popup;
-    padding: 40rpx;
-    width: 560rpx;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-
-    .modal-title {
-      font-size: 18rpx;
-      font-weight: bold;
-      color: $text-dark;
-      margin-bottom: 12rpx;
-    }
-
-    .modal-desc {
-      font-size: 14rpx;
-      color: $gray-text;
-      margin-bottom: 32rpx;
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 24rpx;
-      margin-top: 20rpx;
-    }
-  }
-}
 </style>

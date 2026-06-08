@@ -4,7 +4,10 @@ export default defineAppConfig({
     'pages/ranking/index',
     'pages/profile/index',
     'pages/training/index',
-    'pages/result/index'
+    'pages/result/index',
+    'pages/replay/index',
+    'pages/points/index',
+    'pages/shop/index'
   ],
   window: {
     backgroundTextStyle: 'light',

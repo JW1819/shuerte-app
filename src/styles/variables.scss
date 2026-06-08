@@ -28,6 +28,13 @@ $radius-btn: 12rpx;
 $radius-card: 16rpx;
 $radius-popup: 24rpx;
 
+// 通用文字颜色
+.text-green { color: $green-light; }
+.text-red   { color: $red-light; }
+.text-gray  { color: $gray-text; }
+.text-orange { color: $orange-light; }
+.text-purple { color: $purple-deep; }
+
 $level-colors: (
   3: (bg: #E0F0FF, text: #5B9BD5, border: #A8D4F0, name: "入门"),
   4: (bg: #FFE0EC, text: #D4739A, border: #F0A8C4, name: "初级"),

@@ -26,6 +26,8 @@ interface GridCell {
   clicked: boolean
 }
 
+type GridCell2D = GridCell[][]
+
 interface CloudFunctionResult<T = unknown> {
   success: boolean
   data?: T
@@ -53,6 +55,8 @@ const LEVEL_CONFIG: Record<LevelType, LevelConfigItem> = {
   8: { name: '大神', size: 8, bgColor: '#FFF0E0', textColor: '#C88540', borderColor: '#F5C89A' }
 }
 
+const LEVELS: LevelType[] = Object.keys(LEVEL_CONFIG).map(Number) as LevelType[]
+
 const RATING_CONFIG: Record<LevelType, RatingConfigItem> = {
   3: { S: 5000, A: 8000, B: 12000, C: Infinity },
   4: { S: 10000, A: 16000, B: 24000, C: Infinity },
@@ -62,26 +66,22 @@ const RATING_CONFIG: Record<LevelType, RatingConfigItem> = {
   8: { S: 65000, A: 95000, B: 130000, C: Infinity }
 }
 
-const MACARON_COLORS: string[] = [
+const MACARON_COLORS: string[] = Array.from(new Set([
   '#7EB5D6', '#D4739A', '#C4A830', '#5BAA6F',
   '#8B7DA8', '#C88540', '#D68F7E', '#7EB5A8',
   '#A88BD6', '#D6B07E', '#7E9ED6', '#B0D67E',
   '#D67EA8', '#7ED6C4', '#D6A87E', '#8B9ED6',
-  '#A8D67E', '#D67E7E', '#7EB5D6', '#C4D67E',
+  '#A8D67E', '#D67E7E', '#C4D67E',
   '#D67EB5', '#7ED6A8', '#B5D67E', '#7E8BD6',
   '#D6C47E', '#7ED6D6', '#D67EC4', '#8BD67E',
   '#9E7ED6', '#D6D67E', '#7ED67E', '#D67E9E',
   '#7EC4D6', '#C47ED6', '#7ED6B5', '#D6B57E',
-  '#7E9ED6', '#B57ED6', '#7ED69E', '#D69E7E',
-  '#A87ED6', '#D67EA8', '#7ED68B', '#D68B7E',
-  '#7ED6C4', '#C47ED6', '#8BD67E', '#D67EC4',
-  '#7EB5D6', '#B57ED6', '#9ED67E', '#D69E7E',
-  '#7EA8D6', '#A87ED6', '#B5D67E', '#D67EB5',
-  '#7E9ED6', '#9E7ED6', '#C4D67E', '#D67E9E',
-  '#7ED6A8', '#A87ED6', '#D6A87E', '#7ED6D6'
-]
+  '#B57ED6', '#7ED69E', '#D69E7E',
+  '#A87ED6', '#7ED68B', '#D68B7E',
+  '#7EA8D6', '#9ED67E'
+]))
 
-function generateGrid(level: LevelType): GridCell[][] {
+function generateGrid(level: LevelType): GridCell2D {
   const size = LEVEL_CONFIG[level].size
   const total = size * size
   const numbers = Array.from({ length: total }, (_, i) => i + 1)
@@ -105,8 +105,9 @@ function generateGrid(level: LevelType): GridCell[][] {
   return grid
 }
 
-function getRating(level: LevelType, timeMs: number): RatingType {
-  const config = RATING_CONFIG[level]
+function getRating(level: number, timeMs: number): RatingType {
+  const safeLevel = validateLevel(level)
+  const config = RATING_CONFIG[safeLevel]
   if (timeMs <= config.S) return 'S'
   if (timeMs <= config.A) return 'A'
   if (timeMs <= config.B) return 'B'
@@ -141,17 +142,6 @@ function validateLevel(level: number): LevelType {
   return (l >= 3 && l <= 8) ? l as LevelType : 3
 }
 
-function getLast30Days(): string[] {
-  const days: string[] = []
-  const today = new Date()
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(today)
-    d.setDate(d.getDate() - i)
-    days.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
-  }
-  return days
-}
-
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs)
@@ -159,14 +149,14 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   })
 }
 
-function cloudCall<T = unknown>(name: string, data?: Record<string, unknown>): Promise<CloudFunctionResult<T>> {
+function cloudCall<T = unknown>(name: string, data?: Record<string, unknown>): Promise<T> {
   if (!Taro.cloud) {
-    return Promise.resolve({ success: false, error: 'cloud not available' })
+    return Promise.reject(new Error('cloud not available'))
   }
   return withTimeout(
-    Taro.cloud.callFunction({ name, data: data || {} }) as Promise<{ result: CloudFunctionResult<T> }>,
+    Taro.cloud.callFunction({ name, data: data || {} }).then(res => res.result as T),
     10000
-  ).then(res => res.result).catch(err => ({ success: false, error: String(err) }))
+  )
 }
 
 function safeParseJSON(str: string, fallback: unknown = null): unknown {
@@ -184,6 +174,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
 export {
   CLOUD_ENV_ID,
   LEVEL_CONFIG,
+  LEVELS,
   RATING_CONFIG,
   MACARON_COLORS,
   generateGrid,
@@ -192,7 +183,6 @@ export {
   formatTime,
   formatDuration,
   getToday,
-  getLast30Days,
   validateLevel,
   withTimeout,
   cloudCall,
@@ -200,4 +190,4 @@ export {
   deepEqual
 }
 
-export type { LevelType, RatingType, LevelConfigItem, GridCell, CloudFunctionResult, RankingItem, RankingResult }
+export type { LevelType, RatingType, LevelConfigItem, GridCell, GridCell2D, CloudFunctionResult, RankingItem }

@@ -1,13 +1,19 @@
 <template>
   <view class="result-page">
     <view class="nav-bar">
-    <view class="nav-left" @tap="goHome">
-      <text class="back-icon">←</text>
+      <view class="nav-left" @tap="goHome">
+        <text class="back-icon">←</text>
+      </view>
+      <view class="nav-title">训练结果</view>
+      <view class="nav-right"></view>
     </view>
-    <view class="nav-title">训练结果</view>
-    <view class="nav-right"></view>
-  </view>
 
+    <view v-if="!loaded" class="score-skeleton">
+      <view class="skeleton-block skeleton-rating"></view>
+      <view class="skeleton-block skeleton-label"></view>
+      <view class="skeleton-block skeleton-time"></view>
+    </view>
+    <template v-else>
     <view class="score-area">
       <text class="rating" :style="{ color: ratingColor }">{{ rating }}</text>
       <text class="score-label">本局用时</text>
@@ -51,30 +57,18 @@
       </view>
     </view>
 
+    <view v-if="userStore.lastGame" class="replay-link" @tap="goReplay">
+      <text class="replay-link-text">查看本局方格 →</text>
+    </view>
+    </template>
   </view>
 </template>
 
-<script>
-export default {
-  onShareAppMessage() {
-    return {
-      title: '舒尔特方格 - 专注力训练',
-      path: '/pages/index/index'
-    }
-  },
-  onShareTimeline() {
-    return {
-      title: '舒尔特方格 - 专注力训练'
-    }
-  }
-}
-</script>
-
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Taro, { useRouter } from '@tarojs/taro'
 import { useUserStore } from '@/store/user'
-import { LEVEL_CONFIG, getRating, getRatingColor, formatTime, validateLevel } from '@/utils/index'
+import { LEVEL_CONFIG, getRating, getRatingColor, formatTime, validateLevel, cloudCall } from '@/utils/index'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -84,6 +78,9 @@ const useTime = ref(0)
 const errorCount = ref(0)
 const bestTime = ref(null)
 const beatPercent = ref(null)
+const loaded = ref(false)
+
+let mounted = true
 
 const rating = computed(() => getRating(level.value, useTime.value))
 const ratingColor = computed(() => getRatingColor(rating.value))
@@ -105,8 +102,12 @@ function goRanking() {
     Taro.showToast({ title: '请登录后查看排行', icon: 'none' })
     return
   }
-  Taro.setStorageSync('pendingRankingLevel', level.value)
+  userStore.setPendingRankingLevel(level.value)
   Taro.switchTab({ url: '/pages/ranking/index' })
+}
+
+function goReplay() {
+  Taro.navigateTo({ url: '/pages/replay/index' })
 }
 
 onMounted(() => {
@@ -114,36 +115,32 @@ onMounted(() => {
   useTime.value = Math.max(0, Number(router.params.time) || 0)
   errorCount.value = Math.max(0, Number(router.params.errors) || 0)
   bestTime.value = userStore.getBestTime(level.value)
+  loaded.value = true
 
   if (userStore.isLogin && userStore.userInfo.openId) {
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('timeout')), 8000)
+    cloudCall('getRanking', {
+      level: level.value,
+      myOpenId: userStore.userInfo.openId
     })
-
-    const requestPromise = Taro.cloud.callFunction({
-      name: 'getRanking',
-      data: {
-        level: level.value,
-        myOpenId: userStore.userInfo.openId
-      }
-    })
-
-    Promise.race([requestPromise, timeoutPromise])
-      .then(res => {
-        if (res && res.result && res.result.success && res.result.total > 0 && res.result.myRank > 0) {
-          const total = res.result.total
-          const myRank = res.result.myRank
-          beatPercent.value = Math.round(((total - myRank) / total) * 100)
+      .then(/** @param {{ success?: boolean, total?: number, myRank?: number }} res */ (res) => {
+        if (!mounted) return
+        if (res?.success && res.total && res.total > 0 && res.myRank && res.myRank > 0) {
+          beatPercent.value = Math.round(((res.total - res.myRank) / res.total) * 100)
         } else {
           beatPercent.value = null
         }
       })
       .catch(() => {
+        if (!mounted) return
         beatPercent.value = null
       })
   } else {
     beatPercent.value = null
   }
+})
+
+onUnmounted(() => {
+  mounted = false
 })
 </script>
 
@@ -298,5 +295,40 @@ onMounted(() => {
   justify-content: center;
   gap: 20rpx;
   padding: 20rpx 32rpx;
+}
+
+.replay-link {
+  display: flex;
+  justify-content: center;
+  padding: 16rpx 32rpx 32rpx;
+
+  .replay-link-text {
+    font-size: 26rpx;
+    color: $purple-light;
+    text-decoration: underline;
+  }
+}
+
+.score-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60rpx 0 40rpx;
+
+  .skeleton-block {
+    background: linear-gradient(90deg, #F0E8E0 0%, #F8F0E8 50%, #F0E8E0 100%);
+    background-size: 200% 100%;
+    border-radius: 12rpx;
+    animation: skeletonShimmer 1.2s ease-in-out infinite;
+  }
+
+  .skeleton-rating { width: 160rpx; height: 100rpx; margin-bottom: 20rpx; }
+  .skeleton-label  { width: 120rpx; height: 16rpx; margin-bottom: 12rpx; }
+  .skeleton-time   { width: 220rpx; height: 40rpx; }
+}
+
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 </style>

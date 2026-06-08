@@ -1,0 +1,9 @@
+{
+  "name": "claimTop3Bonus",
+  "version": "1.0.0",
+  "description": "每日排行榜前 3 名奖励领取",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

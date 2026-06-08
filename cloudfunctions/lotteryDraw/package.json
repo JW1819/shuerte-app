@@ -1,0 +1,9 @@
+{
+  "name": "lotteryDraw",
+  "version": "1.0.0",
+  "description": "积分抽奖(蜜月期+收割期波次状态机)",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

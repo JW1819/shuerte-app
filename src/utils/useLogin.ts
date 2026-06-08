@@ -8,21 +8,36 @@ const showLoginDialog = ref(false)
 const loginAvatarUrl = ref('')
 const loginAvatarFileId = ref('')
 const loginNickName = ref('')
-const privacyAuthorized = ref(false)
 let pendingSuccessHandler: LoginSuccessHandler | null = null
 
 const PRIVACY_AUTH_KEY = 'shuerte_privacy_auth'
 
 function requirePrivacy(): Promise<boolean> {
   return new Promise((resolve) => {
-    if (typeof Taro.requirePrivacyAuthorize === 'function') {
-      Taro.requirePrivacyAuthorize({
-        success: () => resolve(true),
-        fail: () => resolve(false)
-      })
-    } else {
+    if (typeof Taro.requirePrivacyAuthorize !== 'function') {
       resolve(true)
+      return
     }
+    let settled = false
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      resolve(false)
+    }, 5000)
+    Taro.requirePrivacyAuthorize({
+      success: () => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve(true)
+      },
+      fail: () => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve(false)
+      }
+    })
   })
 }
 
@@ -46,25 +61,32 @@ export function useLogin() {
   const userStore = useUserStore()
 
   async function openLoginDialog(onLoggedIn?: LoginSuccessHandler) {
+    if (showLoginDialog.value) {
+      // 弹窗已打开,只更新回调(覆盖以防 stale)
+      if (onLoggedIn) pendingSuccessHandler = onLoggedIn
+      return
+    }
     pendingSuccessHandler = onLoggedIn ?? null
-    loginAvatarUrl.value = (userStore.userInfo && userStore.userInfo.avatarUrl) || ''
+    // 只复用 http(s) / wxfile:// 路径,cloud:// fileID 临时 URL 已过期,不直接用
+    const storedAvatar = userStore.userInfo?.avatarUrl || ''
+    loginAvatarUrl.value = /^(https?|wxfile):\/\//.test(storedAvatar) ? storedAvatar : ''
+    loginAvatarFileId.value = ''
     loginNickName.value =
       userStore.userInfo && userStore.userInfo.nickName !== '游客' ? userStore.userInfo.nickName : ''
 
     const cachedAuth = loadPrivacyAuth()
     if (cachedAuth) {
-      privacyAuthorized.value = true
       showLoginDialog.value = true
       return
     }
 
     const authorized = await requirePrivacy()
     if (!authorized) {
+      pendingSuccessHandler = null
       Taro.showToast({ title: '需要同意隐私协议才能登录', icon: 'none' })
       return
     }
     savePrivacyAuth(true)
-    privacyAuthorized.value = true
     showLoginDialog.value = true
   }
 
@@ -104,6 +126,9 @@ export function useLogin() {
         fileInfoSize = 0
       }
       if (!fileInfoSize) throw new Error('文件无效')
+      if (fileInfoSize > 5 * 1024 * 1024) {
+        throw new Error('文件过大,请选择小于 5MB 的图片')
+      }
 
       const cloudPath = `avatars/${Date.now()}_${Math.random().toString(36).substring(2, 11)}.png`
       const uploadRes = await Taro.cloud.uploadFile({
@@ -154,6 +179,7 @@ export function useLogin() {
       Taro.showToast({ title: '请输入昵称', icon: 'none' })
       return false
     }
+    const wasLoggedIn = userStore.isLogin
     const avatarToSave = loginAvatarFileId.value || loginAvatarUrl.value
     userStore.login(loginNickName.value.trim(), avatarToSave)
     loginAvatarFileId.value = ''
@@ -163,13 +189,15 @@ export function useLogin() {
     if (cb) {
       cb()
     }
-    Taro.showToast({ title: '登录成功', icon: 'none' })
+    if (!wasLoggedIn) {
+      Taro.showToast({ title: '登录成功', icon: 'none' })
+    }
     return true
   }
 
   function cancelLogin() {
     showLoginDialog.value = false
-    privacyAuthorized.value = false
+    loginAvatarFileId.value = ''
     pendingSuccessHandler = null
   }
 
@@ -177,7 +205,6 @@ export function useLogin() {
     showLoginDialog,
     loginAvatarUrl,
     loginNickName,
-    privacyAuthorized,
     openLoginDialog,
     onChooseAvatar,
     onNicknameInput,

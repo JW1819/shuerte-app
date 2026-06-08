@@ -17,7 +17,13 @@
     </view>
 
     <view class="progress-area">
-      <view v-if="phase === 'playing'" class="progress-content">
+      <view v-if="phase === 'countdown'" class="countdown-content">
+        <text class="countdown-num" :style="{ color: countdownColor }" :key="countdown">{{ countdown }}</text>
+      </view>
+      <view v-else-if="phase === 'ready'" class="countdown-content">
+        <text class="countdown-num ready-num">开始</text>
+      </view>
+      <view v-else-if="phase === 'playing'" class="progress-content">
         <text class="progress-text">{{ currentTarget - 1 }} / {{ totalCells }}</text>
         <view class="progress-bar">
           <view class="progress-fill" :style="{ width: progressPercent + '%' }"></view>
@@ -27,18 +33,13 @@
     </view>
 
     <view class="grid-area">
-      <view class="grid-container" :style="gridStyle">
-        <view
-          v-for="(cell, idx) in flatGrid"
-          :key="idx"
-          class="grid-cell"
-          :class="{ 'cell-clicked': cell.clicked }"
-          :style="cellStyle(cell)"
-          @tap="handleCellTap(cell)"
-        >
-          <text class="cell-number" :style="{ color: cell.clicked ? '#FFFFFF' : cell.color }">{{ cell.number }}</text>
-        </view>
-      </view>
+      <CellGrid
+        :grid="grid"
+        :level="level"
+        :tappable="phase === 'playing'"
+        :showNumber="phase === 'playing'"
+        @cellTap="handleCellTap"
+      />
     </view>
 
     <view class="action-area">
@@ -50,55 +51,31 @@
       </view>
     </view>
 
-    <view v-if="phase === 'countdown' || phase === 'ready'" class="countdown-overlay">
-      <view class="countdown-content">
-        <view v-if="phase === 'countdown'" class="countdown-circle">
-          <text class="countdown-num" :style="{ color: countdownColor }" :key="countdown">{{ countdown }}</text>
+    <Modal
+      :visible="showExitModal"
+      title="确定退出对局？"
+      desc="退出后不保存本次成绩"
+      @close="showExitModal = false"
+    >
+      <template #actions>
+        <view class="btn btn-gray" @tap="showExitModal = false">
+          <text>取消</text>
         </view>
-        <view v-else class="ready-content">
-          <text class="ready-text">开始</text>
+        <view class="btn btn-pink" @tap="confirmExit">
+          <text>确定</text>
         </view>
-      </view>
-    </view>
-
-    <view v-if="showExitModal" class="modal-mask" @tap="showExitModal = false">
-      <view class="modal-content" @tap.stop>
-        <text class="modal-title">确定退出对局？</text>
-        <text class="modal-desc">退出后不保存本次成绩</text>
-        <view class="modal-actions">
-          <view class="btn btn-gray" @tap="showExitModal = false">
-            <text>取消</text>
-          </view>
-          <view class="btn btn-pink" @tap="confirmExit">
-            <text>确定</text>
-          </view>
-        </view>
-      </view>
-    </view>
+      </template>
+    </Modal>
   </view>
 </template>
-
-<script>
-export default {
-  onShareAppMessage() {
-    return {
-      title: '舒尔特方格 - 专注力训练',
-      path: '/pages/index/index'
-    }
-  },
-  onShareTimeline() {
-    return {
-      title: '舒尔特方格 - 专注力训练'
-    }
-  }
-}
-</script>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Taro, { useRouter } from '@tarojs/taro'
 import { useUserStore } from '@/store/user'
 import { LEVEL_CONFIG, generateGrid, MACARON_COLORS, validateLevel } from '@/utils/index'
+import Modal from '@/components/Modal.vue'
+import CellGrid from '@/components/CellGrid.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -114,25 +91,11 @@ const startTime = ref(0)
 const elapsedMs = ref(0)
 const timerInterval = ref(null)
 const cdIntervalRef = ref(null)
+const readyTimeoutRef = ref(null)
 const showExitModal = ref(false)
 
 const countdownColor = computed(() => {
   return MACARON_COLORS[countdown.value % MACARON_COLORS.length]
-})
-
-const flatGrid = computed(() => {
-  return grid.value.flat()
-})
-
-const gridStyle = computed(() => {
-  const size = level.value
-  return {
-    display: 'grid',
-    gridTemplateColumns: `repeat(${size}, 1fr)`,
-    gap: '8rpx',
-    width: '100%',
-    maxWidth: size <= 5 ? '560rpx' : '640rpx'
-  }
 })
 
 const displayTime = computed(() => {
@@ -148,28 +111,8 @@ const progressPercent = computed(() => {
   return ((currentTarget.value - 1) / totalCells.value) * 100
 })
 
-function cellStyle(cell) {
-  const size = level.value
-  let fontSize = '56rpx'
-  if (size >= 8) fontSize = '28rpx'
-  else if (size >= 7) fontSize = '32rpx'
-  else if (size >= 6) fontSize = '40rpx'
-  const baseStyle = {
-    width: '100%',
-    aspectRatio: '1',
-    borderRadius: '12rpx',
-    backgroundColor: cell.clicked ? cell.color : '#FFFFFF',
-    border: `2rpx solid ${LEVEL_CONFIG[level.value].borderColor}`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s',
-    fontSize
-  }
-  return baseStyle
-}
-
 function initGame() {
+  clearAllTimers()
   const l = validateLevel(Number(router.params.level) || 3)
   level.value = l
   grid.value = generateGrid(l)
@@ -191,19 +134,37 @@ function startCountdown() {
       clearInterval(cdIntervalRef.value)
       cdIntervalRef.value = null
       phase.value = 'ready'
-      setTimeout(() => {
-        phase.value = 'playing'
+      readyTimeoutRef.value = setTimeout(() => {
+        readyTimeoutRef.value = null
+        // B 档微调:startTime 提前到 phase 赋值之前。
+        // 原顺序:phase='playing' → 触发 Vue 响应式 → microtask flush → 浏览器 paint → Date.now()
+        //         这中间会有 0~33ms 的"隐藏时间",timer 起点比视觉首帧晚。
+        // 新顺序:Date.now() 先抢下来,phase 切换和渲染在之后发生,
+        //         timer 起点与首帧 paint 几乎对齐,首格 tap 不再被吞。
         startTime.value = Date.now()
+        phase.value = 'playing'
         startTimer()
       }, 800)
     }
   }, 1000)
 }
 
+function clearAllTimers() {
+  stopTimer()
+  if (cdIntervalRef.value) {
+    clearInterval(cdIntervalRef.value)
+    cdIntervalRef.value = null
+  }
+  if (readyTimeoutRef.value) {
+    clearTimeout(readyTimeoutRef.value)
+    readyTimeoutRef.value = null
+  }
+}
+
 function startTimer() {
   timerInterval.value = setInterval(() => {
     elapsedMs.value = Date.now() - startTime.value
-  }, 50)
+  }, 100)
 }
 
 function stopTimer() {
@@ -223,7 +184,14 @@ function handleCellTap(cell) {
     if (currentTarget.value > total) {
       stopTimer()
       elapsedMs.value = Date.now() - startTime.value
-      userStore.saveGameResult(level.value, elapsedMs.value, errorCount.value)
+      const { isNewRecord } = userStore.saveGameResult(level.value, elapsedMs.value, errorCount.value, grid.value)
+      userStore.recordGameComplete()
+      if (isNewRecord) {
+        userStore.recordNewRecord()
+        Taro.showToast({ title: '新纪录!额外+1分', icon: 'none', duration: 2000 })
+      } else {
+        Taro.showToast({ title: '完成+1分', icon: 'none', duration: 1500 })
+      }
       Taro.redirectTo({
         url: `/pages/result/index?level=${level.value}&time=${elapsedMs.value}&errors=${errorCount.value}`
       })
@@ -234,12 +202,11 @@ function handleCellTap(cell) {
 }
 
 function handleReset() {
-  stopTimer()
   initGame()
 }
 
 function handleExit() {
-  if (phase.value === 'playing' || phase.value === 'countdown') {
+  if (phase.value === 'playing' || phase.value === 'countdown' || phase.value === 'ready') {
     showExitModal.value = true
   } else {
     Taro.navigateBack()
@@ -247,7 +214,7 @@ function handleExit() {
 }
 
 function confirmExit() {
-  stopTimer()
+  clearAllTimers()
   showExitModal.value = false
   Taro.navigateBack()
 }
@@ -257,11 +224,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  stopTimer()
-  if (cdIntervalRef.value) {
-    clearInterval(cdIntervalRef.value)
-    cdIntervalRef.value = null
-  }
+  clearAllTimers()
 })
 
 
@@ -270,26 +233,9 @@ onUnmounted(() => {
 <style lang="scss">
 @use '@/styles/variables' as *;
 
-@keyframes countdownPulse {
-  0% { transform: scale(1.8); opacity: 0; }
-  50% { transform: scale(1.1); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
 @keyframes timerGlow {
   0%, 100% { text-shadow: 0 0 10rpx rgba(107, 93, 122, 0.3); }
   50% { text-shadow: 0 0 20rpx rgba(107, 93, 122, 0.6); }
-}
-
-@keyframes readyFadeIn {
-  0% { transform: scale(0.8); opacity: 0; }
-  50% { transform: scale(1.1); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-@keyframes readyFadeOut {
-  0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.5); opacity: 0; }
 }
 
 .training-page {
@@ -335,12 +281,6 @@ onUnmounted(() => {
   align-items: center;
   padding: 30rpx 0;
 
-  .countdown-num {
-    font-size: 72rpx;
-    font-weight: bold;
-    animation: countdownPulse 0.8s ease-out forwards;
-  }
-
   .timer-text {
     font-size: 56rpx;
     font-weight: bold;
@@ -351,13 +291,33 @@ onUnmounted(() => {
 }
 
 .progress-area {
-  padding: 0 $spacing-lg $spacing-md;
-  min-height: 56rpx;
+  padding: $spacing-sm $spacing-lg;
+  min-height: 120rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  .countdown-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    .countdown-num {
+      font-size: 72rpx;
+      font-weight: bold;
+    }
+
+    .ready-num {
+      font-size: 56rpx;
+      color: $purple-deep;
+    }
+  }
 
   .progress-content {
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
 
     .progress-text {
       font-size: 22rpx;
@@ -382,7 +342,7 @@ onUnmounted(() => {
   }
 
   .progress-placeholder {
-    height: 56rpx;
+    width: 100%;
   }
 }
 
@@ -392,31 +352,6 @@ onUnmounted(() => {
   align-items: center;
   flex: 1;
   padding: 20rpx 32rpx;
-
-  .grid-container {
-    margin: 0 auto;
-  }
-
-  .grid-cell {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.04);
-
-    &:active {
-      transform: scale(0.94);
-    }
-
-    .cell-number {
-      font-weight: bold;
-      font-size: inherit;
-    }
-  }
-
-  .cell-clicked {
-    opacity: 0.7;
-    transform: scale(0.95);
-  }
 }
 
 .action-area {
@@ -426,93 +361,5 @@ onUnmounted(() => {
   padding: $spacing-md $spacing-lg;
   padding-bottom: calc(#{$spacing-md} + constant(safe-area-inset-bottom));
   padding-bottom: calc(#{$spacing-md} + env(safe-area-inset-bottom));
-}
-
-.modal-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-
-  .modal-content {
-    background-color: #FFFFFF;
-    border-radius: $radius-popup;
-    padding: 40rpx;
-    width: 560rpx;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-
-    .modal-title {
-      font-size: 28rpx;
-      font-weight: bold;
-      color: $text-dark;
-      margin-bottom: 16rpx;
-    }
-
-    .modal-desc {
-      font-size: 24rpx;
-      color: $gray-text;
-      margin-bottom: 32rpx;
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 24rpx;
-    }
-  }
-}
-
-.countdown-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-
-  .countdown-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .countdown-circle {
-    width: 450rpx;
-    height: 450rpx;
-    border-radius: 50%;
-    background: rgba(232, 224, 240, 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: countdownPulse 0.6s ease-out forwards;
-
-    .countdown-num {
-      font-size: 120rpx;
-      font-weight: bold;
-    }
-  }
-
-  .ready-content {
-    animation: readyFadeIn 0.4s ease-out forwards;
-
-    .ready-text {
-      font-size: 64rpx;
-      font-weight: bold;
-      color: $purple-deep;
-      text-shadow: 0 4rpx 16rpx rgba(107, 93, 122, 0.4);
-      animation: readyFadeOut 0.4s ease-out 0.4s forwards;
-    }
-  }
 }
 </style>

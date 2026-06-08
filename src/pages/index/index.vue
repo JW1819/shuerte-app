@@ -1,10 +1,5 @@
 <template>
   <view class="home-page">
-    <view class="nav-bar">
-      <view class="nav-left"></view>
-      <view class="nav-right"></view>
-    </view>
-
     <view class="welcome-area">
       <text class="welcome-title">舒尔特方格</text>
       <text class="welcome-subtitle">专注力训练 · 全年龄段适用</text>
@@ -60,49 +55,29 @@
   </view>
 </template>
 
-<script>
-export default {
-  onShareAppMessage() {
-    return {
-      title: '舒尔特方格 - 专注力训练',
-      path: '/pages/index/index'
-    }
-  },
-  onShareTimeline() {
-    return {
-      title: '舒尔特方格 - 专注力训练'
-    }
-  }
-}
-</script>
-
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import LoginDialog from '@/components/LoginDialog.vue'
 import CalendarModal from '@/components/CalendarModal.vue'
 import { useUserStore } from '@/store/user'
-import { LEVEL_CONFIG, formatTime } from '@/utils/index'
+import { LEVEL_CONFIG, LEVELS, formatTime } from '@/utils/index'
 import { useLogin } from '@/utils/useLogin'
 import Taro from '@tarojs/taro'
 
 const userStore = useUserStore()
-const levels = [3, 4, 5, 6, 7, 8]
+const levels = LEVELS
 const levelConfig = LEVEL_CONFIG
 const showCalendar = ref(false)
-
-onMounted(() => {
-  userStore.initStore()
-})
 
 const { openLoginDialog } = useLogin()
 
 function handleSignIn() {
-  if (userStore.todaySigned) {
+  const result = userStore.signIn()
+  if (!result.success) {
     Taro.showToast({ title: '今日已打卡', icon: 'none', duration: 3000 })
     return
   }
-  userStore.signIn()
-  Taro.showToast({ title: '签到成功，连续签到+1', icon: 'none', duration: 3000 })
+  Taro.showToast({ title: `签到成功!连续${result.reward}天,本轮+${result.reward}分`, icon: 'none', duration: 3000 })
 }
 
 function goTraining(level) {
@@ -132,21 +107,6 @@ function goTraining(level) {
   flex-direction: column;
   justify-content: start;
   box-sizing: border-box;
-}
-
-.nav-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10rpx $spacing-lg;
-  height: 32rpx;
-}
-
-.nav-right {
-  padding: 10rpx;
-  .nav-icon {
-    font-size: 36rpx;
-  }
 }
 
 .welcome-area {
@@ -203,13 +163,13 @@ function goTraining(level) {
 }
 
 .level-area {
-  padding: $spacing-md $spacing-lg;
+  padding: $spacing-md 0;
 
   .level-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: $spacing-md;
-    max-width: 420rpx;
+    width: 80%;
     margin: 0 auto;
   }
 
